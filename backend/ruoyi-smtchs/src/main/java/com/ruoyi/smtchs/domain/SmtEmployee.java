@@ -36,6 +36,14 @@ public class SmtEmployee extends BaseEntity
     /** 锁定截止时间 */
     private Date lockedUntil;
 
+    /**
+     * 密码密文（非 smt_employee 列，来自关联的 sys_user.password）。
+     *
+     * <p>仅在登录校验与改密场景由 {@code selectByAccount} 关联查出，
+     * 列表/详情查询不会返回该字段，避免密文外泄。</p>
+     */
+    private String password;
+
     /** 删除标志（0存在 2删除） */
     private String delFlag;
 
@@ -107,6 +115,16 @@ public class SmtEmployee extends BaseEntity
     public void setLockedUntil(Date lockedUntil)
     {
         this.lockedUntil = lockedUntil;
+    }
+
+    public String getPassword()
+    {
+        return password;
+    }
+
+    public void setPassword(String password)
+    {
+        this.password = password;
     }
 
     public String getDelFlag()

@@ -57,6 +57,35 @@ public interface SmtWorkRecordMapper
     int updateRecord(SmtWorkRecord record);
 
     /**
+     * 员工修改后重新提交：显式覆盖全部可编辑列（含把 end_time 置空），
+     * 并把状态重置为 PENDING、清空驳回痕迹。
+     *
+     * <p>与 {@link #updateRecord} 的区别：{@code updateRecord} 对 end_time 等列使用
+     * {@code <if test="... != null">} 动态拼接，无法把已存在的结束时间清空；
+     * 本方法使用固定 SET 列表，适用于「按小时 → 按次」的类型切换。</p>
+     *
+     * @param record 服务记录
+     * @return 影响行数，0 表示记录不存在或已确认
+     */
+    int updateRecordForResubmit(SmtWorkRecord record);
+
+    /**
+     * 新增记录照片。
+     *
+     * @param photo 照片
+     * @return 影响行数
+     */
+    int insertPhoto(SmtRecordPhoto photo);
+
+    /**
+     * 根据记录ID删除全部照片（编辑记录时整体替换）。
+     *
+     * @param recordId 记录ID
+     * @return 影响行数
+     */
+    int deletePhotosByRecordId(Long recordId);
+
+    /**
      * 根据主键逻辑删除服务记录。
      *
      * @param id 主键
@@ -103,6 +132,18 @@ public interface SmtWorkRecordMapper
     int updateStatusIfPending(@Param("id") Long id,
                               @Param("status") String status,
                               @Param("time") Date time);
+
+    /**
+     * 乐观锁驳回：仅当记录仍为 PENDING 时才写入驳回原因与驳回时间。
+     *
+     * @param id     主键
+     * @param reason 驳回原因
+     * @param time   驳回时间
+     * @return 影响行数，0 表示状态已被他人变更
+     */
+    int rejectIfPending(@Param("id") Long id,
+                        @Param("reason") String reason,
+                        @Param("time") Date time);
 
     /**
      * 查询当前员工的服务记录（我的记录）。

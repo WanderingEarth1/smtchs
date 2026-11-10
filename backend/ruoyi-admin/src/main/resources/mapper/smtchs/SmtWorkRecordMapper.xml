@@ -295,6 +295,63 @@
           AND del_flag = '0'
     </update>
 
+    <!-- 乐观锁驳回：只有状态仍为 PENDING 才写入驳回原因 -->
+    <update id="rejectIfPending">
+        UPDATE smt_work_record
+        SET status        = 'REJECTED',
+            reject_reason = #{reason},
+            rejected_at   = #{time},
+            update_time   = NOW()
+        WHERE id = #{id}
+          AND status = 'PENDING'
+          AND del_flag = '0'
+    </update>
+
+    <!-- 员工修改后重新提交：固定 SET 列表，可把 end_time 显式置空 -->
+    <update id="updateRecordForResubmit" parameterType="com.ruoyi.smtchs.domain.SmtWorkRecord">
+        UPDATE smt_work_record
+        SET work_type_id             = #{workTypeId},
+            service_date             = #{serviceDate},
+            start_time               = #{startTime},
+            end_time                 = #{endTime},
+            location                 = #{location},
+            latitude                 = #{latitude},
+            longitude                = #{longitude},
+            geo_captured             = #{geoCaptured},
+            content                  = #{content},
+            remark                   = #{remark},
+            status                   = 'PENDING',
+            is_backfill              = #{isBackfill},
+            reject_reason            = NULL,
+            rejected_at              = NULL,
+            submitted_at             = #{submittedAt},
+            snap_billing_mode        = #{snapBillingMode},
+            snap_unit_price          = #{snapUnitPrice},
+            snap_overtime_start      = #{snapOvertimeStart},
+            snap_overtime_multiplier = #{snapOvertimeMultiplier},
+            snap_rounding_rule       = #{snapRoundingRule},
+            update_by                = #{updateBy},
+            update_time              = NOW()
+        WHERE id = #{id}
+          AND status &lt;&gt; 'APPROVED'
+          AND del_flag = '0'
+    </update>
+
+    <!-- 新增记录照片 -->
+    <insert id="insertPhoto" parameterType="com.ruoyi.smtchs.domain.SmtRecordPhoto"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO smt_record_photo (
+            record_id, url, `sort`, `size`, create_time
+        ) VALUES (
+            #{recordId}, #{url}, IFNULL(#{sort}, 0), IFNULL(#{size}, 0), NOW()
+        )
+    </insert>
+
+    <!-- 编辑记录时整体替换照片 -->
+    <delete id="deletePhotosByRecordId" parameterType="java.lang.Long">
+        DELETE FROM smt_record_photo WHERE record_id = #{recordId}
+    </delete>
+
     <update id="deleteRecordById" parameterType="java.lang.Long">
         UPDATE smt_work_record
         SET del_flag    = '2',

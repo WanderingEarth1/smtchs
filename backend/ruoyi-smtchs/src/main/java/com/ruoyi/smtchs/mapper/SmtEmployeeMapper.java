@@ -82,4 +82,16 @@ public interface SmtEmployeeMapper
      * @return 影响行数
      */
     int resetLoginFailure(Long id);
+
+    /**
+     * 更新员工对应的 sys_user 密码密文。
+     *
+     * <p>密码不落在 smt_employee 表，而是复用若依的 sys_user.password，
+     * 通过 smt_employee.user_id 关联定位。</p>
+     *
+     * @param id       员工主键
+     * @param password 已加密的密码密文
+     * @return 影响行数，0 表示该员工未关联 sys_user
+     */
+    int updatePassword(@Param("id") Long id, @Param("password") String password);
 }
