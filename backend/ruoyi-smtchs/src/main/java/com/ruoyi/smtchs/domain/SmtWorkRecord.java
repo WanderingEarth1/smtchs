@@ -55,8 +55,7 @@ public class SmtWorkRecord extends BaseEntity
     /** 工作内容 */
     private String content;
 
-    /** 备注 */
-    private String remark;
+    // 备注字段 remark 由 BaseEntity 提供，此处不再重复声明
 
     /** 状态（PENDING待确认 APPROVED已确认 REJECTED已驳回） */
     private String status;
@@ -221,16 +220,6 @@ public class SmtWorkRecord extends BaseEntity
     public void setContent(String content)
     {
         this.content = content;
-    }
-
-    public String getRemark()
-    {
-        return remark;
-    }
-
-    public void setRemark(String remark)
-    {
-        this.remark = remark;
     }
 
     public String getStatus()
@@ -399,7 +388,7 @@ public class SmtWorkRecord extends BaseEntity
                 + ", longitude=" + longitude
                 + ", geoCaptured=" + geoCaptured
                 + ", content='" + content + '\''
-                + ", remark='" + remark + '\''
+                + ", remark='" + getRemark() + '\''
                 + ", status='" + status + '\''
                 + ", isBackfill=" + isBackfill
                 + ", rejectReason='" + rejectReason + '\''
