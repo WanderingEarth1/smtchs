@@ -7,7 +7,7 @@
  * - 地图：展示今日/最近记录的位置分布
  * - 科技蓝主色 + 年轻化排版
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
@@ -15,12 +15,16 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import MapView, { type MapPoint } from '@/components/MapView.vue'
 import { useAuth, useTheme } from '@/stores/app'
+import { useToast } from '@/stores/toast'
 import {
+  BizError,
   buildMyMonthlySummary,
   computeRecordSafe,
   getWorkTypeName,
   listMyRecords,
 } from '@/data/service'
+import type { WorkRecord } from '@/core/types'
+import type { MonthlySummary } from '@/core/billing'
 import {
   currentMonthKey,
   formatDateLabel,
@@ -32,37 +36,49 @@ import {
 const router = useRouter()
 const { currentUser, dataVersion } = useAuth()
 const { theme, toggle } = useTheme()
+const toast = useToast()
 
 const monthKey = ref(currentMonthKey())
 
-const summaryData = computed(() => {
-  void dataVersion.value
-  const user = currentUser.value
-  if (!user) {
-    return {
-      summary: {
-        recordCount: 0,
-        countTotal: 0,
-        normalHoursTotal: 0,
-        overtimeHoursTotal: 0,
-        byCountAmount: 0,
-        byHourAmount: 0,
-        totalAmount: 0,
-      },
-      pendingCount: 0,
-      rejectedCount: 0,
+/** 空汇总（加载前占位） */
+function emptySummaryData() {
+  return {
+    summary: {
       recordCount: 0,
-    }
+      countTotal: 0,
+      normalHoursTotal: 0,
+      overtimeHoursTotal: 0,
+      byCountAmount: 0,
+      byHourAmount: 0,
+      totalAmount: 0,
+    } as MonthlySummary,
+    pendingCount: 0,
+    rejectedCount: 0,
+    recordCount: 0,
   }
-  return buildMyMonthlySummary(user.id, monthKey.value)
-})
+}
 
-const allRecords = computed(() => {
-  void dataVersion.value
-  const user = currentUser.value
-  if (!user) return []
-  return listMyRecords(user.id, monthKey.value)
-})
+const summaryData = ref(emptySummaryData())
+const allRecords = ref<WorkRecord[]>([])
+const loading = ref(false)
+
+/** 加载首页数据 */
+async function loadData(): Promise<void> {
+  if (!currentUser.value) return
+  loading.value = true
+  try {
+    const [summary, records] = await Promise.all([
+      buildMyMonthlySummary(monthKey.value),
+      listMyRecords(monthKey.value),
+    ])
+    summaryData.value = summary
+    allRecords.value = records
+  } catch (err) {
+    toast.error(err instanceof BizError ? err.message : '加载失败')
+  } finally {
+    loading.value = false
+  }
+}
 
 const recentRecords = computed(() => allRecords.value.slice(0, 4))
 
@@ -95,6 +111,14 @@ const todayCount = computed(() => {
   const today = new Date()
   const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   return allRecords.value.filter((r) => r.serviceDate === key).length
+})
+
+watch([monthKey, dataVersion], () => {
+  void loadData()
+})
+
+onMounted(() => {
+  void loadData()
 })
 
 const todayLabel = computed(() => {

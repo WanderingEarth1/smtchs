@@ -8,8 +8,13 @@ import AppIcon from '@/components/AppIcon.vue'
 import { useAuth, useTheme } from '@/stores/app'
 import { useToast } from '@/stores/toast'
 import { BizError } from '@/data/service'
-import { DEMO_ACCOUNTS } from '@/data/seed'
 import { isMobileDevice } from '@/router'
+
+/** 演示账号（与后端 smtchs_data.sql 的初始化数据一致） */
+const DEMO_ACCOUNTS = {
+  admin: { account: 'admin', password: 'admin123' },
+  employee: { account: 'zhangsan', password: '123456' },
+} as const
 
 const router = useRouter()
 const route = useRoute()

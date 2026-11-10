@@ -7,20 +7,23 @@
  * - 筛选用下划线式标签，不用分段控件
  * - 列表按日期分组，组头用日期 + 当日合计
  */
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useAuth } from '@/stores/app'
+import { useToast } from '@/stores/toast'
 import {
+  BizError,
   buildMyMonthlySummary,
   computeRecordSafe,
   getWorkTypeName,
   listMyRecords,
 } from '@/data/service'
 import type { RecordStatus, WorkRecord } from '@/core/types'
+import type { MonthlySummary } from '@/core/billing'
 import {
   currentMonthKey,
   formatDateLabel,
@@ -32,25 +35,63 @@ import {
 const route = useRoute()
 const router = useRouter()
 const { currentUser, dataVersion } = useAuth()
+const toast = useToast()
 
 const monthKey = ref(currentMonthKey())
 const statusFilter = ref<RecordStatus | 'ALL'>('ALL')
+
+/** 全量记录（用于计数） */
+const allRecords = ref<WorkRecord[]>([])
+/** 当前筛选后的记录 */
+const records = ref<WorkRecord[]>([])
+const monthSummary = ref<{ summary: MonthlySummary; pendingCount: number; rejectedCount: number; recordCount: number } | null>(null)
+const loading = ref(false)
+
+/** 加载数据 */
+async function loadData(): Promise<void> {
+  if (!currentUser.value) return
+  loading.value = true
+  try {
+    const [all, summary] = await Promise.all([
+      listMyRecords(monthKey.value),
+      buildMyMonthlySummary(monthKey.value),
+    ])
+    allRecords.value = all
+    monthSummary.value = summary
+    applyFilter()
+  } catch (err) {
+    toast.error(err instanceof BizError ? err.message : '加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+/** 应用状态筛选（纯前端过滤，避免重复请求） */
+function applyFilter(): void {
+  records.value =
+    statusFilter.value === 'ALL'
+      ? allRecords.value
+      : allRecords.value.filter((r) => r.status === statusFilter.value)
+}
 
 watch(
   () => route.query.status,
   (v) => {
     if (typeof v === 'string' && ['PENDING', 'APPROVED', 'REJECTED'].includes(v)) {
       statusFilter.value = v as RecordStatus
+      applyFilter()
     }
   },
   { immediate: true },
 )
 
-const records = computed(() => {
-  void dataVersion.value
-  const user = currentUser.value
-  if (!user) return []
-  return listMyRecords(user.id, monthKey.value, statusFilter.value)
+watch(statusFilter, applyFilter)
+watch([monthKey, dataVersion], () => {
+  void loadData()
+})
+
+onMounted(() => {
+  void loadData()
 })
 
 /** 按日期分组 */
@@ -69,25 +110,12 @@ const grouped = computed(() => {
   }))
 })
 
-const counts = computed(() => {
-  void dataVersion.value
-  const user = currentUser.value
-  if (!user) return { ALL: 0, PENDING: 0, APPROVED: 0, REJECTED: 0 }
-  const all = listMyRecords(user.id, monthKey.value)
-  return {
-    ALL: all.length,
-    PENDING: all.filter((r) => r.status === 'PENDING').length,
-    APPROVED: all.filter((r) => r.status === 'APPROVED').length,
-    REJECTED: all.filter((r) => r.status === 'REJECTED').length,
-  }
-})
-
-const monthSummary = computed(() => {
-  void dataVersion.value
-  const user = currentUser.value
-  if (!user) return null
-  return buildMyMonthlySummary(user.id, monthKey.value)
-})
+const counts = computed(() => ({
+  ALL: allRecords.value.length,
+  PENDING: allRecords.value.filter((r) => r.status === 'PENDING').length,
+  APPROVED: allRecords.value.filter((r) => r.status === 'APPROVED').length,
+  REJECTED: allRecords.value.filter((r) => r.status === 'REJECTED').length,
+}))
 
 const filters: Array<{ key: RecordStatus | 'ALL'; label: string }> = [
   { key: 'ALL', label: '全部' },

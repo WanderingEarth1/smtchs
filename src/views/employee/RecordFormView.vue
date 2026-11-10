@@ -29,7 +29,7 @@ import {
   type RecordDraft,
 } from '@/data/service'
 import { calculateBilling, ROUNDING_LABELS } from '@/core/billing'
-import type { PhotoRef, WorkRecord } from '@/core/types'
+import type { PhotoRef, SysConfig, WorkRecord, WorkType } from '@/core/types'
 import { captureGeo, type GeoResult } from '@/core/photo'
 import { formatDateLabel, formatMoney, formatMonthLabel, monthOf, todayKey, weekdayLabel } from '@/core/date'
 
@@ -42,15 +42,23 @@ const toast = useToast()
 const editingId = computed(() => route.params.id as string | undefined)
 const isEditing = computed(() => !!editingId.value)
 
-const workTypes = computed(() => {
-  void dataVersion.value
-  return listWorkTypes(false)
+const workTypes = ref<WorkType[]>([])
+const config = ref<SysConfig>({
+  overtimeStart: '18:00',
+  overtimeMultiplier: 2,
+  roundingRule: 'EXACT',
 })
 
-const config = computed(() => {
-  void dataVersion.value
-  return getConfig()
-})
+/** 加载基础数据（工作类型 + 计费配置） */
+async function loadBaseData(): Promise<void> {
+  try {
+    const [types, cfg] = await Promise.all([listWorkTypes(false), getConfig()])
+    workTypes.value = types
+    config.value = cfg
+  } catch (err) {
+    toast.error(err instanceof BizError ? err.message : '加载配置失败')
+  }
+}
 
 const draft = reactive<RecordDraft>({
   workTypeId: '',
@@ -105,8 +113,10 @@ const preview = computed(() => {
 
 /* ---------------- 初始化（编辑模式回填） ---------------- */
 onMounted(async () => {
+  await loadBaseData()
+
   if (isEditing.value) {
-    const record = getRecord(editingId.value!)
+    const record = await getRecord(editingId.value!)
     const user = currentUser.value
     if (!record) {
       toast.error('记录不存在')
@@ -249,12 +259,12 @@ async function submit(): Promise<void> {
     }
 
     if (isEditing.value) {
-      updateRecord(editingId.value!, user.id, draft)
+      await updateRecord(editingId.value!, draft)
       toast.success('记录已修改并重新提交审核')
       bumpDataVersion()
       await router.replace(`/e/records/${editingId.value}`)
     } else {
-      const record = createRecord(user.id, draft)
+      const record = await createRecord(draft)
       toast.success('记录提交成功，等待管理员确认')
       bumpDataVersion()
       await router.replace(`/e/records/${record.id}`)

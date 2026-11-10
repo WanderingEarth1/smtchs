@@ -3,7 +3,7 @@
  * 管理端移动 · 审核
  * 支持逐条确认 / 驳回（原因必填）/ 批量确认
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -24,7 +24,7 @@ import {
   listEngineers,
   rejectRecord,
 } from '@/data/service'
-import type { RecordStatus, WorkRecord } from '@/core/types'
+import type { Employee, RecordStatus, WorkRecord } from '@/core/types'
 import { ROUNDING_LABELS } from '@/core/billing'
 import {
   currentMonthKey,
@@ -45,33 +45,58 @@ const employeeFilter = ref('')
 
 const selectedIds = ref<Set<string>>(new Set())
 
-const engineers = computed(() => {
-  void dataVersion.value
-  return listEngineers()
-})
+const engineers = ref<Employee[]>([])
+const records = ref<WorkRecord[]>([])
+const allRecords = ref<WorkRecord[]>([])
+const loading = ref(false)
 
-const records = computed(() => {
-  void dataVersion.value
-  return listAllRecords({
-    monthKey: monthKey.value,
-    status: statusFilter.value,
-    employeeId: employeeFilter.value || undefined,
-  })
-})
-
-const counts = computed(() => {
-  void dataVersion.value
-  const all = listAllRecords({
-    monthKey: monthKey.value,
-    employeeId: employeeFilter.value || undefined,
-  })
-  return {
-    ALL: all.length,
-    PENDING: all.filter((r) => r.status === 'PENDING').length,
-    APPROVED: all.filter((r) => r.status === 'APPROVED').length,
-    REJECTED: all.filter((r) => r.status === 'REJECTED').length,
+/** 加载审核列表（状态筛选在前端做） */
+async function loadData(): Promise<void> {
+  loading.value = true
+  try {
+    const [emps, all] = await Promise.all([
+      listEngineers(),
+      listAllRecords({
+        monthKey: monthKey.value,
+        employeeId: employeeFilter.value || undefined,
+      }),
+    ])
+    engineers.value = emps
+    allRecords.value = all
+    applyFilter()
+  } catch (err) {
+    toast.error(err instanceof BizError ? err.message : '加载失败')
+  } finally {
+    loading.value = false
   }
+}
+
+/** 应用状态筛选 */
+function applyFilter(): void {
+  records.value =
+    statusFilter.value === 'ALL'
+      ? allRecords.value
+      : allRecords.value.filter((r) => r.status === statusFilter.value)
+}
+
+watch(statusFilter, () => {
+  applyFilter()
+  selectedIds.value = new Set()
 })
+watch([monthKey, employeeFilter, dataVersion], () => {
+  void loadData()
+})
+
+onMounted(() => {
+  void loadData()
+})
+
+const counts = computed(() => ({
+  ALL: allRecords.value.length,
+  PENDING: allRecords.value.filter((r) => r.status === 'PENDING').length,
+  APPROVED: allRecords.value.filter((r) => r.status === 'APPROVED').length,
+  REJECTED: allRecords.value.filter((r) => r.status === 'REJECTED').length,
+}))
 
 const filters: Array<{ key: RecordStatus | 'ALL'; label: string }> = [
   { key: 'PENDING', label: '待确认' },
@@ -104,7 +129,6 @@ function toggleSelectAll(): void {
 const detailId = ref<string | null>(null)
 
 const detailRecord = computed<WorkRecord | null>(() => {
-  void dataVersion.value
   if (!detailId.value) return null
   return records.value.find((r) => r.id === detailId.value) ?? null
 })
@@ -165,17 +189,21 @@ function submitReject(): void {
 /* ---------------- 批量 ---------------- */
 const bulkOpen = ref(false)
 
-function doBulkApprove(): void {
+async function doBulkApprove(): Promise<void> {
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
-  const result = approveRecords(ids)
-  bumpDataVersion()
-  selectedIds.value = new Set()
-  bulkOpen.value = false
-  if (result.failed > 0) {
-    toast.show(`已确认 ${result.success} 条，${result.failed} 条被跳过`)
-  } else {
-    toast.success(`已批量确认 ${result.success} 条记录`)
+  try {
+    const result = await approveRecords(ids)
+    bumpDataVersion()
+    selectedIds.value = new Set()
+    bulkOpen.value = false
+    if (result.failed > 0) {
+      toast.show(`已确认 ${result.success} 条，${result.failed} 条被跳过`)
+    } else {
+      toast.success(`已批量确认 ${result.success} 条记录`)
+    }
+  } catch (err) {
+    toast.error(err instanceof BizError ? err.message : '批量确认失败')
   }
 }
 </script>

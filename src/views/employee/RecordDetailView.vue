@@ -2,12 +2,13 @@
 /**
  * 记录详情（员工端）—— 含计费明细、修正痕迹、编辑/删除
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import AppSheet from '@/components/AppSheet.vue'
 import MapView, { type MapPoint } from '@/components/MapView.vue'
+import type { RecordRevision, WorkRecord } from '@/core/types'
 import { useAuth } from '@/stores/app'
 import { useToast } from '@/stores/toast'
 import {
@@ -34,19 +35,32 @@ const toast = useToast()
 
 const recordId = computed(() => route.params.id as string)
 
-const record = computed(() => {
-  void dataVersion.value
-  return getRecord(recordId.value)
-})
+const record = ref<WorkRecord | null>(null)
+const revisions = ref<RecordRevision[]>([])
+const loading = ref(false)
+
+/** 加载记录与修正痕迹 */
+async function loadData(): Promise<void> {
+  loading.value = true
+  try {
+    const [rec, revs] = await Promise.all([
+      getRecord(recordId.value),
+      listRevisions(recordId.value).catch(() => [] as RecordRevision[]),
+    ])
+    record.value = rec ?? null
+    revisions.value = revs
+  } catch (err) {
+    toast.error(err instanceof BizError ? err.message : '加载失败')
+  } finally {
+    loading.value = false
+  }
+}
 
 const workType = computed(() => (record.value ? getWorkType(record.value.workTypeId) : undefined))
 
 const billing = computed(() => (record.value ? computeRecordSafe(record.value) : null))
 
-const revisions = computed(() => {
-  void dataVersion.value
-  return listRevisions(recordId.value)
-})
+
 
 const canEdit = computed(
   () =>
@@ -63,11 +77,10 @@ function goEdit(): void {
   void router.push(`/e/records/${record.value.id}/edit`)
 }
 
-function doDelete(): void {
-  const user = currentUser.value
-  if (!record.value || !user) return
+async function doDelete(): Promise<void> {
+  if (!record.value) return
   try {
-    deleteRecord(record.value.id, user.id)
+    await deleteRecord(record.value.id)
     bumpDataVersion()
     toast.success('记录已删除')
     confirmDelete.value = false
@@ -76,6 +89,14 @@ function doDelete(): void {
     toast.error(err instanceof BizError ? err.message : '删除失败')
   }
 }
+
+watch([recordId, dataVersion], () => {
+  void loadData()
+})
+
+onMounted(() => {
+  void loadData()
+})
 
 function back(): void {
   router.back()

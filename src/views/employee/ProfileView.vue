@@ -2,13 +2,14 @@
 /**
  * 员工「我的」页 —— 账号信息、修改密码、主题、退出
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import AppSheet from '@/components/AppSheet.vue'
 import { useAuth, useTheme } from '@/stores/app'
 import { useToast } from '@/stores/toast'
 import { BizError, changeOwnPassword, buildMyMonthlySummary } from '@/data/service'
+import type { MonthlySummary } from '@/core/billing'
 import { currentMonthKey, formatMoneyShort } from '@/core/date'
 
 const router = useRouter()
@@ -16,11 +17,29 @@ const { currentUser, logout, dataVersion } = useAuth()
 const { theme, toggle } = useTheme()
 const toast = useToast()
 
-const monthSummary = computed(() => {
-  void dataVersion.value
-  const user = currentUser.value
-  if (!user) return null
-  return buildMyMonthlySummary(user.id, currentMonthKey())
+const monthSummary = ref<{
+  summary: MonthlySummary
+  pendingCount: number
+  rejectedCount: number
+  recordCount: number
+} | null>(null)
+
+/** 加载本月汇总 */
+async function loadSummary(): Promise<void> {
+  if (!currentUser.value) return
+  try {
+    monthSummary.value = await buildMyMonthlySummary(currentMonthKey())
+  } catch {
+    monthSummary.value = null
+  }
+}
+
+watch([dataVersion, currentUser], () => {
+  void loadSummary()
+})
+
+onMounted(() => {
+  void loadSummary()
 })
 
 const pwdOpen = ref(false)
@@ -68,8 +87,8 @@ async function submitPwd(): Promise<void> {
   }
 }
 
-function doLogout(): void {
-  logout()
+async function doLogout(): Promise<void> {
+  await logout()
   void router.replace('/login')
 }
 </script>

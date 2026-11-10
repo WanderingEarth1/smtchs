@@ -57,57 +57,6 @@ const router = createRouter({
       meta: { role: 'EMPLOYEE', title: '记录详情' },
     },
 
-    /* ================= 管理端 · PC（若依风格，全功能） ================= */
-    {
-      path: '/a/pc',
-      component: () => import('@/layouts/AdminPcLayout.vue'),
-      meta: { role: 'ADMIN', platform: 'pc' },
-      children: [
-        {
-          path: 'dashboard',
-          name: 'admin-pc-dashboard',
-          component: () => import('@/views/admin/DashboardView.vue'),
-          meta: { title: '经营概览' },
-        },
-        {
-          path: 'review',
-          name: 'admin-pc-review',
-          component: () => import('@/views/admin/ReviewView.vue'),
-          meta: { title: '记录审核' },
-        },
-        {
-          path: 'reports',
-          name: 'admin-pc-reports',
-          component: () => import('@/views/admin/ReportsView.vue'),
-          meta: { title: '月度报表' },
-        },
-        {
-          path: 'config/employees',
-          name: 'admin-pc-config-employees',
-          component: () => import('@/views/admin/ConfigEmployeesView.vue'),
-          meta: { title: '员工管理' },
-        },
-        {
-          path: 'config/work-types',
-          name: 'admin-pc-config-worktypes',
-          component: () => import('@/views/admin/ConfigWorkTypesView.vue'),
-          meta: { title: '工作类型' },
-        },
-        {
-          path: 'config/prices',
-          name: 'admin-pc-config-prices',
-          component: () => import('@/views/admin/ConfigPricesView.vue'),
-          meta: { title: '单价矩阵' },
-        },
-        {
-          path: 'config/rules',
-          name: 'admin-pc-config-rules',
-          component: () => import('@/views/admin/ConfigRulesView.vue'),
-          meta: { title: '计费规则' },
-        },
-      ],
-    },
-
     /* ================= 管理端 · 移动（只读 + 审核 + 汇总） ================= */
     {
       path: '/a/m',
@@ -137,16 +86,13 @@ const router = createRouter({
 
     /* ================= 入口与兜底 ================= */
     { path: '/', redirect: '/e/home' },
-    // 旧路径兼容：/a/* 按设备类型自动分流
-    { path: '/a', redirect: () => (isMobileDevice() ? '/a/m/summary' : '/a/pc/dashboard') },
-    {
-      path: '/a/dashboard',
-      redirect: () => (isMobileDevice() ? '/a/m/summary' : '/a/pc/dashboard'),
-    },
-    { path: '/a/review', redirect: () => (isMobileDevice() ? '/a/m/review' : '/a/pc/review') },
-    { path: '/a/reports', redirect: () => (isMobileDevice() ? '/a/m/summary' : '/a/pc/reports') },
-    { path: '/a/config', redirect: '/a/pc/config/employees' },
-    { path: '/a/config/:pathMatch(.*)*', redirect: '/a/pc/config/employees' },
+    // 旧路径兼容：管理端 PC 已由若依前端独立提供，此处统一指向移动端
+    { path: '/a', redirect: '/a/m/summary' },
+    { path: '/a/dashboard', redirect: '/a/m/summary' },
+    { path: '/a/review', redirect: '/a/m/review' },
+    { path: '/a/reports', redirect: '/a/m/summary' },
+    { path: '/a/config', redirect: '/a/m/summary' },
+    { path: '/a/config/:pathMatch(.*)*', redirect: '/a/m/summary' },
     { path: '/:pathMatch(.*)*', redirect: '/e/home' },
   ],
 })
@@ -195,9 +141,14 @@ router.beforeEach((to) => {
   return true
 })
 
-/** 管理员首页：按设备分流 */
+/**
+ * 管理员首页
+ *
+ * 管理端 PC 由若依前端（frontend-admin）独立提供，
+ * 本工程只承载员工端 H5 与管理端移动端，故统一指向移动端汇总页。
+ */
 function adminHome(): string {
-  return isMobileDevice() ? '/a/m/summary' : '/a/pc/dashboard'
+  return '/a/m/summary'
 }
 
 router.afterEach((to) => {

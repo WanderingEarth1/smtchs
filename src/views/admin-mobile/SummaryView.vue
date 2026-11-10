@@ -3,13 +3,17 @@
  * 管理端移动 · 金额汇总
  * 只读视图：总览指标 + 按员工汇总 + 按类型汇总
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import AppSheet from '@/components/AppSheet.vue'
 import { useAuth, useTheme } from '@/stores/app'
+import { useToast } from '@/stores/toast'
+import type { Employee } from '@/core/types'
+import type { MonthlyReport } from '@/api/report'
 import {
+  BizError,
   buildMonthlyReport,
   computeRecordSafe,
   getEmployeeName,
@@ -27,27 +31,62 @@ import {
 
 const { dataVersion } = useAuth()
 const { theme, toggle } = useTheme()
+const toast = useToast()
 
 const monthKey = ref(currentMonthKey())
 const employeeFilter = ref('')
 
-const engineers = computed(() => {
-  void dataVersion.value
-  return listEngineers()
+const engineers = ref<Employee[]>([])
+const report = ref<MonthlyReport>({
+  monthKey: '',
+  summary: {
+    recordCount: 0,
+    countTotal: 0,
+    normalHoursTotal: 0,
+    overtimeHoursTotal: 0,
+    byCountAmount: 0,
+    byHourAmount: 0,
+    totalAmount: 0,
+  },
+  byEmployee: [],
+  byWorkType: [],
+  approvedRecords: [],
+  pendingCount: 0,
+  rejectedCount: 0,
+})
+const loading = ref(false)
+
+/** 加载汇总数据 */
+async function loadData(): Promise<void> {
+  loading.value = true
+  try {
+    const [emps, rep] = await Promise.all([
+      listEngineers(),
+      buildMonthlyReport({
+        monthKey: monthKey.value,
+        employeeId: employeeFilter.value || undefined,
+      }),
+    ])
+    engineers.value = emps
+    report.value = rep
+  } catch (err) {
+    toast.error(err instanceof BizError ? err.message : '加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+watch([monthKey, employeeFilter, dataVersion], () => {
+  void loadData()
 })
 
-const report = computed(() => {
-  void dataVersion.value
-  return buildMonthlyReport({
-    monthKey: monthKey.value,
-    employeeId: employeeFilter.value || undefined,
-  })
+onMounted(() => {
+  void loadData()
 })
 
 const drillEmployeeId = ref<string | null>(null)
 
 const drillRecords = computed(() => {
-  void dataVersion.value
   if (!drillEmployeeId.value) return []
   return report.value.approvedRecords.filter((r) => r.employeeId === drillEmployeeId.value)
 })

@@ -3,7 +3,7 @@
  * 管理端移动 · 详细记录数据（只读）
  * 支持按月 / 状态 / 员工 / 关键词筛选，点击查看详情
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -11,7 +11,9 @@ import EmptyState from '@/components/EmptyState.vue'
 import AppSheet from '@/components/AppSheet.vue'
 import MapView, { type MapPoint } from '@/components/MapView.vue'
 import { useAuth, useTheme } from '@/stores/app'
+import { useToast } from '@/stores/toast'
 import {
+  BizError,
   computeRecordSafe,
   getEmployeeName,
   getWorkType,
@@ -19,7 +21,7 @@ import {
   listAllRecords,
   listEngineers,
 } from '@/data/service'
-import type { RecordStatus, WorkRecord } from '@/core/types'
+import type { Employee, RecordStatus, WorkRecord } from '@/core/types'
 import { ROUNDING_LABELS } from '@/core/billing'
 import {
   currentMonthKey,
@@ -33,41 +35,63 @@ import {
 
 const { dataVersion } = useAuth()
 const { theme, toggle } = useTheme()
+const toast = useToast()
 
 const monthKey = ref(currentMonthKey())
 const statusFilter = ref<RecordStatus | 'ALL'>('ALL')
 const employeeFilter = ref('')
 const keyword = ref('')
 
-const engineers = computed(() => {
-  void dataVersion.value
-  return listEngineers()
-})
+const engineers = ref<Employee[]>([])
+const records = ref<WorkRecord[]>([])
+const allRecords = ref<WorkRecord[]>([])
+const loading = ref(false)
 
-const records = computed(() => {
-  void dataVersion.value
-  return listAllRecords({
-    monthKey: monthKey.value,
-    status: statusFilter.value,
-    employeeId: employeeFilter.value || undefined,
-    keyword: keyword.value,
-  })
-})
-
-const counts = computed(() => {
-  void dataVersion.value
-  const all = listAllRecords({
-    monthKey: monthKey.value,
-    employeeId: employeeFilter.value || undefined,
-    keyword: keyword.value,
-  })
-  return {
-    ALL: all.length,
-    PENDING: all.filter((r) => r.status === 'PENDING').length,
-    APPROVED: all.filter((r) => r.status === 'APPROVED').length,
-    REJECTED: all.filter((r) => r.status === 'REJECTED').length,
+/** 加载记录列表（状态筛选在前端做，减少请求） */
+async function loadData(): Promise<void> {
+  loading.value = true
+  try {
+    const [emps, all] = await Promise.all([
+      listEngineers(),
+      listAllRecords({
+        monthKey: monthKey.value,
+        employeeId: employeeFilter.value || undefined,
+        keyword: keyword.value,
+      }),
+    ])
+    engineers.value = emps
+    allRecords.value = all
+    applyFilter()
+  } catch (err) {
+    toast.error(err instanceof BizError ? err.message : '加载失败')
+  } finally {
+    loading.value = false
   }
+}
+
+/** 应用状态筛选 */
+function applyFilter(): void {
+  records.value =
+    statusFilter.value === 'ALL'
+      ? allRecords.value
+      : allRecords.value.filter((r) => r.status === statusFilter.value)
+}
+
+watch(statusFilter, applyFilter)
+watch([monthKey, employeeFilter, keyword, dataVersion], () => {
+  void loadData()
 })
+
+onMounted(() => {
+  void loadData()
+})
+
+const counts = computed(() => ({
+  ALL: allRecords.value.length,
+  PENDING: allRecords.value.filter((r) => r.status === 'PENDING').length,
+  APPROVED: allRecords.value.filter((r) => r.status === 'APPROVED').length,
+  REJECTED: allRecords.value.filter((r) => r.status === 'REJECTED').length,
+}))
 
 const filters: Array<{ key: RecordStatus | 'ALL'; label: string }> = [
   { key: 'ALL', label: '全部' },
@@ -80,7 +104,6 @@ const filters: Array<{ key: RecordStatus | 'ALL'; label: string }> = [
 const detailId = ref<string | null>(null)
 
 const detailRecord = computed<WorkRecord | null>(() => {
-  void dataVersion.value
   if (!detailId.value) return null
   return records.value.find((r) => r.id === detailId.value) ?? null
 })

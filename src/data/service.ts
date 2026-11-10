@@ -1,12 +1,15 @@
 /**
- * 业务服务层 —— 集中实现需求文档第 5 章全部功能规则
+ * 业务服务层 —— HTTP API 适配层
  *
- * 所有写操作都经过此层，保证规则单点实现、可测试。
+ * 改造说明（V2.0）：
+ * - 原实现基于 localStorage，现改为调用后端 REST API
+ * - 纯逻辑函数（计费、校验）保持不变，仍在前端运行
+ * - 名称查询类函数（getEmployeeName 等）走模块级缓存，保持同步签名
+ * - 所有 API 错误统一包装为 BizError，便于 UI 层处理
  */
 import type {
   BillingResult,
   Employee,
-  LoginLog,
   PriceRule,
   RecordRevision,
   RecordStatus,
@@ -15,27 +18,17 @@ import type {
   WorkType,
 } from '@/core/types'
 import { calculateBilling, accumulate, emptySummary, type MonthlySummary } from '@/core/billing'
-import { hashPassword, verifyPassword } from '@/core/hash'
-import { currentMonthKey, monthOf, todayKey } from '@/core/date'
-import {
-  loadEmployees,
-  loadLoginLogs,
-  loadPriceRules,
-  loadRecords,
-  loadRevisions,
-  loadSession,
-  loadSysConfig,
-  loadWorkTypes,
-  saveEmployees,
-  saveLoginLogs,
-  savePriceRules,
-  saveRecords,
-  saveRevisions,
-  saveSession,
-  saveSysConfig,
-  saveWorkTypes,
-  type Session,
-} from './storage'
+import { todayKey } from '@/core/date'
+
+import * as authApi from '@/api/auth'
+import * as employeeApi from '@/api/employee'
+import * as workTypeApi from '@/api/worktype'
+import * as priceApi from '@/api/price'
+import * as configApi from '@/api/config'
+import * as recordApi from '@/api/record'
+import * as reviewApi from '@/api/review'
+import * as reportApi from '@/api/report'
+import { ApiError } from '@/api/request'
 
 /* ============================================================
    常量
@@ -47,18 +40,14 @@ export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 export const MAX_FAILED_ATTEMPTS = 5
 /** 锁定持续时间：15 分钟（LOG-05） */
 export const LOCK_DURATION_MS = 15 * 60 * 1000
-/** 照片数量上限（REC 字段规则） */
+/** 照片数量上限 */
 export const MAX_PHOTOS = 3
 /** 照片压缩目标体积 */
 export const PHOTO_MAX_BYTES = 300 * 1024
 
 /* ============================================================
-   工具
+   异常
    ============================================================ */
-
-function uid(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
-}
 
 /** 业务异常：携带可直接展示给用户的中文消息 */
 export class BizError extends Error {
@@ -68,63 +57,108 @@ export class BizError extends Error {
   }
 }
 
+/** 把 API 错误统一包装为 BizError */
+function wrapError(err: unknown): never {
+  if (err instanceof BizError) throw err
+  if (err instanceof ApiError) throw new BizError(err.message)
+  if (err instanceof Error) throw new BizError(err.message)
+  throw new BizError('操作失败，请稍后重试')
+}
+
 /* ============================================================
-   配置读取
+   模块级缓存（供同步查询函数使用）
    ============================================================ */
 
-const DEFAULT_CONFIG: SysConfig = {
-  overtimeStart: '18:00',
-  overtimeMultiplier: 2,
-  roundingRule: 'EXACT',
+let employeeCache: Employee[] = []
+let workTypeCache: WorkType[] = []
+let priceCache: PriceRule[] = []
+
+/** 刷新员工缓存 */
+export async function refreshEmployeeCache(): Promise<void> {
+  try {
+    employeeCache = await employeeApi.listEmployees()
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
-export function getConfig(): SysConfig {
-  return loadSysConfig() ?? { ...DEFAULT_CONFIG }
+/** 刷新工作类型缓存 */
+export async function refreshWorkTypeCache(): Promise<void> {
+  try {
+    workTypeCache = await workTypeApi.listWorkTypes()
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
-export function updateConfig(patch: Partial<SysConfig>): SysConfig {
-  const current = getConfig()
-  const next: SysConfig = { ...current, ...patch }
+/** 刷新单价缓存 */
+export async function refreshPriceCache(): Promise<void> {
+  try {
+    priceCache = await priceApi.getPriceMatrix()
+  } catch (err) {
+    wrapError(err)
+  }
+}
 
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(next.overtimeStart)) {
-    throw new BizError('加班起算时间格式应为 HH:mm')
-  }
-  if (!Number.isFinite(next.overtimeMultiplier) || next.overtimeMultiplier < 1) {
-    throw new BizError('加班倍率必须不小于 1')
-  }
-  if (next.overtimeMultiplier > 10) {
-    throw new BizError('加班倍率不能超过 10')
-  }
-  if (!['EXACT', 'HALF_HOUR_UP', 'HOUR_UP'].includes(next.roundingRule)) {
-    throw new BizError('取整规则取值非法')
-  }
+/** 一次性刷新全部缓存（应用启动或登录后调用） */
+export async function refreshAllCaches(): Promise<void> {
+  await Promise.all([refreshEmployeeCache(), refreshWorkTypeCache(), refreshPriceCache()])
+}
 
-  saveSysConfig(next)
-  return next
+/* ============================================================
+   配置（CFG-04 / CFG-05）
+   ============================================================ */
+
+export async function getConfig(): Promise<SysConfig> {
+  try {
+    return await configApi.getConfig()
+  } catch (err) {
+    wrapError(err)
+  }
+}
+
+export async function updateConfig(patch: Partial<SysConfig>): Promise<SysConfig> {
+  try {
+    return await configApi.updateConfig(patch)
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
 /* ============================================================
    员工管理（CFG-01）
    ============================================================ */
 
-export function listEmployees(): Employee[] {
-  return loadEmployees()
+export async function listEmployees(): Promise<Employee[]> {
+  try {
+    employeeCache = await employeeApi.listEmployees()
+    return employeeCache
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
-export function listActiveEmployees(): Employee[] {
-  return loadEmployees().filter((e) => e.status === 'ACTIVE')
+export async function listActiveEmployees(): Promise<Employee[]> {
+  const all = await listEmployees()
+  return all.filter((e) => e.status === 'ACTIVE')
 }
 
-export function listEngineers(): Employee[] {
-  return loadEmployees().filter((e) => e.role === 'EMPLOYEE')
+export async function listEngineers(): Promise<Employee[]> {
+  const all = await listEmployees()
+  return all.filter((e) => e.role === 'EMPLOYEE')
 }
 
-export function getEmployee(id: string): Employee | undefined {
-  return loadEmployees().find((e) => e.id === id)
+export async function getEmployee(id: string): Promise<Employee | undefined> {
+  try {
+    return await employeeApi.getEmployee(id)
+  } catch {
+    return undefined
+  }
 }
 
+/** 同步查缓存（模板中大量使用） */
 export function getEmployeeName(id: string): string {
-  return getEmployee(id)?.name ?? '未知员工'
+  return employeeCache.find((e) => e.id === id)?.name ?? '未知员工'
 }
 
 export interface CreateEmployeeInput {
@@ -134,302 +168,162 @@ export interface CreateEmployeeInput {
 }
 
 export async function createEmployee(input: CreateEmployeeInput): Promise<Employee> {
-  const name = input.name.trim()
-  const account = input.account.trim()
-
-  if (!name) throw new BizError('请填写员工姓名')
-  if (name.length > 20) throw new BizError('姓名不能超过 20 个字符')
-  if (!account) throw new BizError('请填写登录账号')
-  if (!/^[a-zA-Z0-9_]{3,20}$/.test(account)) {
-    throw new BizError('登录账号需为 3~20 位字母、数字或下划线')
+  try {
+    const emp = await employeeApi.createEmployee(input)
+    await refreshEmployeeCache()
+    return emp
+  } catch (err) {
+    wrapError(err)
   }
-  if (!input.password || input.password.length < 6) {
-    throw new BizError('初始密码至少 6 位')
-  }
-
-  const employees = loadEmployees()
-  if (employees.some((e) => e.account.toLowerCase() === account.toLowerCase())) {
-    throw new BizError(`登录账号「${account}」已存在`)
-  }
-
-  const employee: Employee = {
-    id: uid('emp'),
-    name,
-    account,
-    passwordHash: await hashPassword(input.password),
-    status: 'ACTIVE',
-    role: 'EMPLOYEE',
-    createdAt: new Date().toISOString(),
-    failedAttempts: 0,
-    lockedUntil: null,
-  }
-  employees.push(employee)
-  saveEmployees(employees)
-  return employee
 }
 
-export function updateEmployee(
+export async function updateEmployee(
   id: string,
   patch: Partial<Pick<Employee, 'name' | 'account' | 'status'>>,
-): Employee {
-  const employees = loadEmployees()
-  const idx = employees.findIndex((e) => e.id === id)
-  if (idx < 0) throw new BizError('员工不存在')
-
-  const target = employees[idx]
-  if (target.role === 'ADMIN' && patch.status === 'DISABLED') {
-    throw new BizError('不能停用管理员账号')
+): Promise<Employee> {
+  try {
+    const emp = await employeeApi.updateEmployee({ id, ...patch })
+    await refreshEmployeeCache()
+    return emp
+  } catch (err) {
+    wrapError(err)
   }
-
-  if (patch.name !== undefined) {
-    const name = patch.name.trim()
-    if (!name) throw new BizError('姓名不能为空')
-    if (name.length > 20) throw new BizError('姓名不能超过 20 个字符')
-    target.name = name
-  }
-
-  if (patch.account !== undefined) {
-    const account = patch.account.trim()
-    if (!/^[a-zA-Z0-9_]{3,20}$/.test(account)) {
-      throw new BizError('登录账号需为 3~20 位字母、数字或下划线')
-    }
-    const dup = employees.some(
-      (e) => e.id !== id && e.account.toLowerCase() === account.toLowerCase(),
-    )
-    if (dup) throw new BizError(`登录账号「${account}」已存在`)
-    target.account = account
-  }
-
-  if (patch.status !== undefined) {
-    target.status = patch.status
-    if (patch.status === 'ACTIVE') {
-      target.failedAttempts = 0
-      target.lockedUntil = null
-    }
-  }
-
-  employees[idx] = target
-  saveEmployees(employees)
-  return target
 }
 
 export async function resetPassword(id: string, newPassword: string): Promise<void> {
-  if (!newPassword || newPassword.length < 6) {
-    throw new BizError('新密码至少 6 位')
+  try {
+    await employeeApi.resetPassword(id, newPassword)
+  } catch (err) {
+    wrapError(err)
   }
-  const employees = loadEmployees()
-  const target = employees.find((e) => e.id === id)
-  if (!target) throw new BizError('员工不存在')
-  target.passwordHash = await hashPassword(newPassword)
-  target.failedAttempts = 0
-  target.lockedUntil = null
-  saveEmployees(employees)
 }
 
 export async function changeOwnPassword(
-  id: string,
+  _id: string,
   oldPassword: string,
   newPassword: string,
 ): Promise<void> {
-  const employees = loadEmployees()
-  const target = employees.find((e) => e.id === id)
-  if (!target) throw new BizError('账号不存在')
-
-  const ok = await verifyPassword(oldPassword, target.passwordHash)
-  if (!ok) throw new BizError('原密码不正确')
-  if (!newPassword || newPassword.length < 6) throw new BizError('新密码至少 6 位')
-  if (newPassword === oldPassword) throw new BizError('新密码不能与原密码相同')
-
-  target.passwordHash = await hashPassword(newPassword)
-  saveEmployees(employees)
+  try {
+    await authApi.changePassword(oldPassword, newPassword)
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
-/**
- * 删除员工（CFG-01）
- * 若该员工已有服务记录，则改为停用，避免历史统计断链（LOG-06）
- */
-export function deleteEmployee(id: string): { disabled: boolean } {
-  const employees = loadEmployees()
-  const target = employees.find((e) => e.id === id)
-  if (!target) throw new BizError('员工不存在')
-  if (target.role === 'ADMIN') throw new BizError('不能删除管理员账号')
-
-  const hasRecords = loadRecords().some((r) => r.employeeId === id)
-  if (hasRecords) {
-    target.status = 'DISABLED'
-    saveEmployees(employees)
-    return { disabled: true }
+export async function deleteEmployee(id: string): Promise<{ disabled: boolean }> {
+  try {
+    const result = await employeeApi.deleteEmployee(id)
+    await refreshEmployeeCache()
+    return result
+  } catch (err) {
+    wrapError(err)
   }
-
-  saveEmployees(employees.filter((e) => e.id !== id))
-  savePriceRules(loadPriceRules().filter((p) => p.employeeId !== id))
-  return { disabled: false }
 }
 
 /* ============================================================
    工作类型管理（CFG-02）
    ============================================================ */
 
-export function listWorkTypes(includeDisabled = true): WorkType[] {
-  const all = loadWorkTypes().sort((a, b) => a.sort - b.sort)
-  return includeDisabled ? all : all.filter((w) => w.enabled)
+export async function listWorkTypes(includeDisabled = true): Promise<WorkType[]> {
+  try {
+    workTypeCache = await workTypeApi.listWorkTypes()
+    return includeDisabled ? workTypeCache : workTypeCache.filter((w) => w.enabled)
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
+/** 同步查缓存 */
 export function getWorkType(id: string): WorkType | undefined {
-  return loadWorkTypes().find((w) => w.id === id)
+  return workTypeCache.find((w) => w.id === id)
 }
 
+/** 同步查缓存 */
 export function getWorkTypeName(id: string): string {
-  return getWorkType(id)?.name ?? '未知类型'
+  return workTypeCache.find((w) => w.id === id)?.name ?? '未知类型'
 }
 
-export function createWorkType(input: {
+export async function createWorkType(input: {
   name: string
   billingMode: WorkType['billingMode']
-}): WorkType {
-  const name = input.name.trim()
-  if (!name) throw new BizError('请填写类型名称')
-  if (name.length > 20) throw new BizError('类型名称不能超过 20 个字符')
-
-  const list = loadWorkTypes()
-  if (list.some((w) => w.name === name)) throw new BizError(`类型「${name}」已存在`)
-
-  const wt: WorkType = {
-    id: uid('wt'),
-    name,
-    billingMode: input.billingMode,
-    enabled: true,
-    sort: list.length + 1,
+}): Promise<WorkType> {
+  try {
+    const wt = await workTypeApi.createWorkType(input)
+    await refreshWorkTypeCache()
+    return wt
+  } catch (err) {
+    wrapError(err)
   }
-  list.push(wt)
-  saveWorkTypes(list)
-  return wt
 }
 
-export function updateWorkType(
+export async function updateWorkType(
   id: string,
   patch: Partial<Pick<WorkType, 'name' | 'billingMode' | 'enabled'>>,
-): WorkType {
-  const list = loadWorkTypes()
-  const idx = list.findIndex((w) => w.id === id)
-  if (idx < 0) throw new BizError('工作类型不存在')
-
-  const target = list[idx]
-
-  if (patch.name !== undefined) {
-    const name = patch.name.trim()
-    if (!name) throw new BizError('类型名称不能为空')
-    if (list.some((w) => w.id !== id && w.name === name)) {
-      throw new BizError(`类型「${name}」已存在`)
-    }
-    target.name = name
+): Promise<WorkType> {
+  try {
+    const wt = await workTypeApi.updateWorkType({ id, ...patch })
+    await refreshWorkTypeCache()
+    return wt
+  } catch (err) {
+    wrapError(err)
   }
-
-  if (patch.billingMode !== undefined && patch.billingMode !== target.billingMode) {
-    // 计费模式变更会影响历史记录口径，但历史记录已固化快照，故允许变更
-    target.billingMode = patch.billingMode
-  }
-
-  if (patch.enabled !== undefined) {
-    target.enabled = patch.enabled
-  }
-
-  list[idx] = target
-  saveWorkTypes(list)
-  return target
 }
 
-export function deleteWorkType(id: string): { disabled: boolean } {
-  const list = loadWorkTypes()
-  const target = list.find((w) => w.id === id)
-  if (!target) throw new BizError('工作类型不存在')
-
-  const used = loadRecords().some((r) => r.workTypeId === id)
-  if (used) {
-    target.enabled = false
-    saveWorkTypes(list)
-    return { disabled: true }
+export async function deleteWorkType(id: string): Promise<{ disabled: boolean }> {
+  try {
+    const result = await workTypeApi.deleteWorkType(id)
+    await refreshWorkTypeCache()
+    return result
+  } catch (err) {
+    wrapError(err)
   }
-
-  saveWorkTypes(list.filter((w) => w.id !== id))
-  savePriceRules(loadPriceRules().filter((p) => p.workTypeId !== id))
-  return { disabled: false }
 }
 
 /* ============================================================
    单价矩阵（CFG-03）
    ============================================================ */
 
-export function listPriceRules(): PriceRule[] {
-  return loadPriceRules()
+export async function listPriceRules(): Promise<PriceRule[]> {
+  try {
+    priceCache = await priceApi.getPriceMatrix()
+    return priceCache
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
-/** 取某员工某类型的单价 */
+/** 同步查缓存 */
 export function getUnitPrice(employeeId: string, workTypeId: string): number {
-  const rule = loadPriceRules().find(
-    (p) => p.employeeId === employeeId && p.workTypeId === workTypeId,
+  return (
+    priceCache.find((p) => p.employeeId === employeeId && p.workTypeId === workTypeId)?.price ?? 0
   )
-  return rule?.price ?? 0
 }
 
-/** 设置单价（存在则更新，不存在则新增） */
-export function setUnitPrice(employeeId: string, workTypeId: string, price: number): PriceRule {
-  if (!Number.isFinite(price) || price < 0) throw new BizError('单价必须为非负数')
-  if (price > 100000) throw new BizError('单价不能超过 100000')
-
-  const rules = loadPriceRules()
-  const existing = rules.find(
-    (p) => p.employeeId === employeeId && p.workTypeId === workTypeId,
-  )
-  if (existing) {
-    existing.price = Math.round(price * 100) / 100
-    existing.effectiveAt = new Date().toISOString()
-    savePriceRules(rules)
-    return existing
+export async function setUnitPrice(
+  employeeId: string,
+  workTypeId: string,
+  price: number,
+): Promise<PriceRule> {
+  try {
+    const rule = await priceApi.setUnitPrice(employeeId, workTypeId, price)
+    await refreshPriceCache()
+    return rule
+  } catch (err) {
+    wrapError(err)
   }
-
-  const rule: PriceRule = {
-    id: uid('pr'),
-    employeeId,
-    workTypeId,
-    price: Math.round(price * 100) / 100,
-    effectiveAt: new Date().toISOString(),
-  }
-  rules.push(rule)
-  savePriceRules(rules)
-  return rule
 }
 
-/** 按行快速复制：把某员工的全部单价复制给其他员工（CFG-03） */
-export function copyPriceRow(fromEmployeeId: string, toEmployeeIds: string[]): number {
-  const rules = loadPriceRules()
-  const source = rules.filter((p) => p.employeeId === fromEmployeeId)
-  if (source.length === 0) throw new BizError('该员工尚未配置任何单价')
-
-  let count = 0
-  for (const toId of toEmployeeIds) {
-    if (toId === fromEmployeeId) continue
-    for (const src of source) {
-      const existing = rules.find(
-        (p) => p.employeeId === toId && p.workTypeId === src.workTypeId,
-      )
-      if (existing) {
-        existing.price = src.price
-        existing.effectiveAt = new Date().toISOString()
-      } else {
-        rules.push({
-          id: uid('pr'),
-          employeeId: toId,
-          workTypeId: src.workTypeId,
-          price: src.price,
-          effectiveAt: new Date().toISOString(),
-        })
-      }
-      count++
-    }
+export async function copyPriceRow(
+  fromEmployeeId: string,
+  toEmployeeIds: string[],
+): Promise<number> {
+  try {
+    const count = await priceApi.copyPriceRow(fromEmployeeId, toEmployeeIds)
+    await refreshPriceCache()
+    return count
+  } catch (err) {
+    wrapError(err)
   }
-  savePriceRules(rules)
-  return count
 }
 
 /* ============================================================
@@ -438,130 +332,49 @@ export function copyPriceRow(fromEmployeeId: string, toEmployeeIds: string[]): n
 
 export interface LoginResult {
   employee: Employee
-  session: Session
-}
-
-function logLogin(account: string, success: boolean, message: string): void {
-  const logs = loadLoginLogs()
-  const log: LoginLog = {
-    id: uid('log'),
-    account,
-    at: new Date().toISOString(),
-    ip: '127.0.0.1',
-    success,
-    message,
-  }
-  logs.unshift(log)
-  // 仅保留最近 200 条
-  saveLoginLogs(logs.slice(0, 200))
-}
-
-export function listLoginLogs(): LoginLog[] {
-  return loadLoginLogs()
+  token: string
 }
 
 export async function login(account: string, password: string): Promise<LoginResult> {
-  const acc = account.trim()
-  if (!acc) throw new BizError('请输入登录账号')
-  if (!password) throw new BizError('请输入密码')
-
-  const employees = loadEmployees()
-  const idx = employees.findIndex((e) => e.account.toLowerCase() === acc.toLowerCase())
-
-  if (idx < 0) {
-    logLogin(acc, false, '账号不存在')
-    throw new BizError('账号或密码错误')
+  try {
+    const result = await authApi.login(account, password)
+    localStorage.setItem('smtchs.token', result.token)
+    await refreshAllCaches()
+    return { employee: result.user, token: result.token }
+  } catch (err) {
+    wrapError(err)
   }
-
-  const emp = employees[idx]
-
-  // LOG-06：停用员工无法登录
-  if (emp.status === 'DISABLED') {
-    logLogin(acc, false, '账号已停用')
-    throw new BizError('该账号已停用，请联系管理员')
-  }
-
-  // LOG-05：锁定检查
-  if (emp.lockedUntil) {
-    const until = new Date(emp.lockedUntil).getTime()
-    if (Date.now() < until) {
-      const mins = Math.ceil((until - Date.now()) / 60000)
-      logLogin(acc, false, '账号锁定中')
-      throw new BizError(`密码连续输错 5 次，账号已锁定，请 ${mins} 分钟后再试`)
-    }
-    // 锁定已过期，重置
-    emp.lockedUntil = null
-    emp.failedAttempts = 0
-  }
-
-  const ok = await verifyPassword(password, emp.passwordHash)
-  if (!ok) {
-    emp.failedAttempts += 1
-    if (emp.failedAttempts >= MAX_FAILED_ATTEMPTS) {
-      emp.lockedUntil = new Date(Date.now() + LOCK_DURATION_MS).toISOString()
-      emp.failedAttempts = 0
-      employees[idx] = emp
-      saveEmployees(employees)
-      logLogin(acc, false, '密码错误达 5 次，账号锁定 15 分钟')
-      throw new BizError('密码连续输错 5 次，账号已锁定 15 分钟')
-    }
-    employees[idx] = emp
-    saveEmployees(employees)
-    const left = MAX_FAILED_ATTEMPTS - emp.failedAttempts
-    logLogin(acc, false, `密码错误，剩余 ${left} 次机会`)
-    throw new BizError(`账号或密码错误，还可尝试 ${left} 次`)
-  }
-
-  // 登录成功：重置失败计数
-  emp.failedAttempts = 0
-  emp.lockedUntil = null
-  employees[idx] = emp
-  saveEmployees(employees)
-
-  const now = Date.now()
-  const session: Session = {
-    employeeId: emp.id,
-    expiresAt: now + SESSION_TTL_MS,
-    lastActiveAt: now,
-  }
-  saveSession(session)
-  logLogin(acc, true, '登录成功')
-
-  return { employee: emp, session }
 }
 
-export function logout(): void {
-  saveSession(null)
+export async function logout(): Promise<void> {
+  try {
+    await authApi.logout()
+  } catch {
+    // 登出失败不阻断本地清理
+  } finally {
+    localStorage.removeItem('smtchs.token')
+    employeeCache = []
+    workTypeCache = []
+    priceCache = []
+  }
 }
 
 /**
- * 恢复会话（LOG-03 记住登录 / 静默续期）
- * 返回当前登录员工，无有效会话返回 null
+ * 恢复会话（LOG-03 记住登录）
+ * 有 token 则拉取用户信息，失败则清 token
  */
-export function restoreSession(): Employee | null {
-  const session = loadSession()
-  if (!session) return null
+export async function restoreSession(): Promise<Employee | null> {
+  const token = localStorage.getItem('smtchs.token')
+  if (!token) return null
 
-  const now = Date.now()
-  if (now > session.expiresAt) {
-    saveSession(null)
+  try {
+    const user = await authApi.getInfo()
+    await refreshAllCaches()
+    return user
+  } catch {
+    localStorage.removeItem('smtchs.token')
     return null
   }
-
-  const emp = getEmployee(session.employeeId)
-  if (!emp || emp.status === 'DISABLED') {
-    saveSession(null)
-    return null
-  }
-
-  // 静默续期：每次活跃刷新过期时间
-  saveSession({
-    employeeId: session.employeeId,
-    expiresAt: now + SESSION_TTL_MS,
-    lastActiveAt: now,
-  })
-
-  return emp
 }
 
 /* ============================================================
@@ -582,7 +395,7 @@ export interface RecordDraft {
   photos: WorkRecord['photos']
 }
 
-/** 校验记录草稿，返回字段级错误 */
+/** 校验记录草稿，返回字段级错误（纯逻辑，保持同步） */
 export function validateDraft(draft: RecordDraft): Record<string, string> {
   const errors: Record<string, string> = {}
 
@@ -638,250 +451,128 @@ export function validateDraft(draft: RecordDraft): Record<string, string> {
   return errors
 }
 
-/** 生成流水号 */
-function nextSerialNo(records: WorkRecord[]): string {
-  const monthKey = currentMonthKey().replace('-', '')
-  const prefix = `SR${monthKey}`
-  const maxSeq = records
-    .filter((r) => r.serialNo.startsWith(prefix))
-    .reduce((max, r) => {
-      const seq = Number(r.serialNo.slice(prefix.length))
-      return Number.isFinite(seq) ? Math.max(max, seq) : max
-    }, 0)
-  return `${prefix}${String(maxSeq + 1).padStart(4, '0')}`
-}
-
-/** 新增记录（REC-01 / REC-02） */
-export function createRecord(employeeId: string, draft: RecordDraft): WorkRecord {
-  const errors = validateDraft(draft)
-  const firstError = Object.values(errors)[0]
-  if (firstError) throw new BizError(firstError)
-
-  const wt = getWorkType(draft.workTypeId)!
-  const unitPrice = getUnitPrice(employeeId, draft.workTypeId)
-  if (unitPrice <= 0) {
-    throw new BizError('该工作类型尚未配置单价，请联系管理员')
-  }
-
-  const cfg = getConfig()
-  const records = loadRecords()
-  const now = new Date().toISOString()
-
-  const record: WorkRecord = {
-    id: uid('rec'),
-    serialNo: nextSerialNo(records),
-    employeeId,
+/** 把前端草稿转为 API 请求体 */
+function toApiDraft(draft: RecordDraft): recordApi.RecordDraft {
+  return {
     workTypeId: draft.workTypeId,
     serviceDate: draft.serviceDate,
     startTime: draft.startTime,
-    endTime: wt.billingMode === 'BY_HOUR' ? draft.endTime : null,
+    endTime: draft.endTime,
     location: draft.location.trim(),
     latitude: draft.latitude,
     longitude: draft.longitude,
     geoCaptured: draft.geoCaptured,
     content: draft.content.trim(),
     remark: draft.remark.trim(),
-    photos: draft.photos.slice(0, MAX_PHOTOS),
-    status: 'PENDING',
-    // REC-02：非当日提交自动标记补录
-    isBackfill: draft.serviceDate !== todayKey(),
-    rejectReason: null,
-    submittedAt: now,
-    confirmedAt: null,
-    rejectedAt: null,
-    billingSnapshot: {
-      billingMode: wt.billingMode,
-      unitPrice,
-      overtimeStart: cfg.overtimeStart,
-      overtimeMultiplier: cfg.overtimeMultiplier,
-      roundingRule: cfg.roundingRule,
-    },
+    photoUrls: draft.photos.map((p) => p.dataUrl),
   }
-
-  records.unshift(record)
-  saveRecords(records)
-  return record
 }
 
-/** 修改记录（REC-03：仅待确认 / 已驳回的本人记录可改） */
-export function updateRecord(
-  recordId: string,
-  employeeId: string,
-  draft: RecordDraft,
-): WorkRecord {
-  const records = loadRecords()
-  const idx = records.findIndex((r) => r.id === recordId)
-  if (idx < 0) throw new BizError('记录不存在')
-
-  const record = records[idx]
-  if (record.employeeId !== employeeId) throw new BizError('只能修改自己的记录')
-  if (record.status === 'APPROVED') throw new BizError('已确认的记录已锁定，无法修改')
-
+export async function createRecord(draft: RecordDraft): Promise<WorkRecord> {
   const errors = validateDraft(draft)
   const firstError = Object.values(errors)[0]
   if (firstError) throw new BizError(firstError)
 
-  const wt = getWorkType(draft.workTypeId)!
-  const unitPrice = getUnitPrice(employeeId, draft.workTypeId)
-  if (unitPrice <= 0) throw new BizError('该工作类型尚未配置单价，请联系管理员')
-
-  const cfg = getConfig()
-
-  // 修改后重新提交，重走审核（AUD-05）
-  record.workTypeId = draft.workTypeId
-  record.serviceDate = draft.serviceDate
-  record.startTime = draft.startTime
-  record.endTime = wt.billingMode === 'BY_HOUR' ? draft.endTime : null
-  record.location = draft.location.trim()
-  record.latitude = draft.latitude
-  record.longitude = draft.longitude
-  record.geoCaptured = draft.geoCaptured
-  record.content = draft.content.trim()
-  record.remark = draft.remark.trim()
-  record.photos = draft.photos.slice(0, MAX_PHOTOS)
-  record.status = 'PENDING'
-  record.isBackfill = draft.serviceDate !== todayKey()
-  record.rejectReason = null
-  record.rejectedAt = null
-  record.submittedAt = new Date().toISOString()
-  record.billingSnapshot = {
-    billingMode: wt.billingMode,
-    unitPrice,
-    overtimeStart: cfg.overtimeStart,
-    overtimeMultiplier: cfg.overtimeMultiplier,
-    roundingRule: cfg.roundingRule,
+  try {
+    return await recordApi.createRecord(toApiDraft(draft))
+  } catch (err) {
+    wrapError(err)
   }
-
-  records[idx] = record
-  saveRecords(records)
-  return record
 }
 
-/** 删除记录（REC-03） */
-export function deleteRecord(recordId: string, employeeId: string): void {
-  const records = loadRecords()
-  const record = records.find((r) => r.id === recordId)
-  if (!record) throw new BizError('记录不存在')
-  if (record.employeeId !== employeeId) throw new BizError('只能删除自己的记录')
-  if (record.status === 'APPROVED') throw new BizError('已确认的记录已锁定，无法删除')
+export async function updateRecord(recordId: string, draft: RecordDraft): Promise<WorkRecord> {
+  const errors = validateDraft(draft)
+  const firstError = Object.values(errors)[0]
+  if (firstError) throw new BizError(firstError)
 
-  saveRecords(records.filter((r) => r.id !== recordId))
+  try {
+    return await recordApi.updateRecord(recordId, toApiDraft(draft))
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
-export function getRecord(id: string): WorkRecord | undefined {
-  return loadRecords().find((r) => r.id === id)
+export async function deleteRecord(recordId: string): Promise<void> {
+  try {
+    await recordApi.deleteRecord(recordId)
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
-/** 我的记录列表（REC-04）：按月 + 状态筛选 */
-export function listMyRecords(
-  employeeId: string,
+export async function getRecord(id: string): Promise<WorkRecord | undefined> {
+  try {
+    return await recordApi.getRecord(id)
+  } catch {
+    return undefined
+  }
+}
+
+export async function listMyRecords(
   monthKey: string,
   status?: RecordStatus | 'ALL',
-): WorkRecord[] {
-  return loadRecords()
-    .filter((r) => r.employeeId === employeeId && monthOf(r.serviceDate) === monthKey)
-    .filter((r) => !status || status === 'ALL' || r.status === status)
-    .sort((a, b) => {
-      // 按服务日期倒序，同日按开始时间倒序
-      if (a.serviceDate !== b.serviceDate) return a.serviceDate < b.serviceDate ? 1 : -1
-      return a.startTime < b.startTime ? 1 : -1
-    })
+): Promise<WorkRecord[]> {
+  try {
+    return await recordApi.listMyRecords(monthKey, status === 'ALL' ? undefined : status)
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
-/** 全部记录（管理端） */
-export function listAllRecords(filter?: {
+export async function listAllRecords(filter?: {
   monthKey?: string
   status?: RecordStatus | 'ALL'
   employeeId?: string
   workTypeId?: string
   keyword?: string
-}): WorkRecord[] {
-  let list = loadRecords()
-  if (filter?.monthKey) list = list.filter((r) => monthOf(r.serviceDate) === filter.monthKey!)
-  if (filter?.status && filter.status !== 'ALL') {
-    list = list.filter((r) => r.status === filter.status)
+}): Promise<WorkRecord[]> {
+  try {
+    return await recordApi.listAllRecords({
+      month: filter?.monthKey,
+      status: filter?.status === 'ALL' ? undefined : filter?.status,
+      employeeId: filter?.employeeId,
+      workTypeId: filter?.workTypeId,
+      keyword: filter?.keyword,
+    })
+  } catch (err) {
+    wrapError(err)
   }
-  if (filter?.employeeId) list = list.filter((r) => r.employeeId === filter.employeeId)
-  if (filter?.workTypeId) list = list.filter((r) => r.workTypeId === filter.workTypeId)
-  if (filter?.keyword) {
-    const kw = filter.keyword.trim().toLowerCase()
-    if (kw) {
-      list = list.filter(
-        (r) =>
-          r.location.toLowerCase().includes(kw) ||
-          r.content.toLowerCase().includes(kw) ||
-          r.serialNo.toLowerCase().includes(kw) ||
-          getEmployeeName(r.employeeId).toLowerCase().includes(kw),
-      )
-    }
-  }
-  return list.sort((a, b) => {
-    if (a.serviceDate !== b.serviceDate) return a.serviceDate < b.serviceDate ? 1 : -1
-    return a.startTime < b.startTime ? 1 : -1
-  })
 }
 
 /* ============================================================
    审核（AUD-01 ~ AUD-05）
    ============================================================ */
 
-/** 确认单条（AUD-02） */
-export function approveRecord(recordId: string): WorkRecord {
-  const records = loadRecords()
-  const record = records.find((r) => r.id === recordId)
-  if (!record) throw new BizError('记录不存在')
-  if (record.status === 'APPROVED') throw new BizError('该记录已确认')
-  if (record.status === 'REJECTED') throw new BizError('已驳回的记录需员工修改后重新提交')
-
-  record.status = 'APPROVED'
-  record.confirmedAt = new Date().toISOString()
-  record.rejectReason = null
-  saveRecords(records)
-  return record
-}
-
-/** 批量确认（AUD-03） */
-export function approveRecords(recordIds: string[]): { success: number; failed: number } {
-  const records = loadRecords()
-  const now = new Date().toISOString()
-  let success = 0
-  let failed = 0
-
-  for (const id of recordIds) {
-    const record = records.find((r) => r.id === id)
-    if (!record || record.status !== 'PENDING') {
-      failed++
-      continue
-    }
-    record.status = 'APPROVED'
-    record.confirmedAt = now
-    record.rejectReason = null
-    success++
+export async function approveRecord(recordId: string): Promise<void> {
+  try {
+    await reviewApi.approveRecord(recordId)
+  } catch (err) {
+    wrapError(err)
   }
-
-  saveRecords(records)
-  return { success, failed }
 }
 
-/** 驳回（AUD-02：驳回原因必填） */
-export function rejectRecord(recordId: string, reason: string): WorkRecord {
+export async function approveRecords(
+  recordIds: string[],
+): Promise<{ success: number; failed: number }> {
+  try {
+    return await reviewApi.approveRecords(recordIds)
+  } catch (err) {
+    wrapError(err)
+  }
+}
+
+export async function rejectRecord(recordId: string, reason: string): Promise<void> {
   const trimmed = reason.trim()
   if (!trimmed) throw new BizError('驳回时必须填写驳回原因')
   if (trimmed.length > 200) throw new BizError('驳回原因不能超过 200 个字符')
 
-  const records = loadRecords()
-  const record = records.find((r) => r.id === recordId)
-  if (!record) throw new BizError('记录不存在')
-  if (record.status === 'APPROVED') throw new BizError('已确认的记录不能驳回')
-
-  record.status = 'REJECTED'
-  record.rejectReason = trimmed
-  record.rejectedAt = new Date().toISOString()
-  saveRecords(records)
-  return record
+  try {
+    await reviewApi.rejectRecord(recordId, trimmed)
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
-/** 修正已确认记录（AUD-04：留痕） */
 export interface RevisionInput {
   startTime?: string
   endTime?: string | null
@@ -891,80 +582,39 @@ export interface RevisionInput {
   note: string
 }
 
-export function reviseRecord(
+export async function reviseRecord(
   recordId: string,
-  operatorName: string,
   input: RevisionInput,
-): WorkRecord {
-  const records = loadRecords()
-  const idx = records.findIndex((r) => r.id === recordId)
-  if (idx < 0) throw new BizError('记录不存在')
-
-  const record = records[idx]
-  if (record.status !== 'APPROVED') {
-    throw new BizError('仅已确认的记录需要走修正流程')
-  }
+): Promise<WorkRecord> {
   if (!input.note.trim()) throw new BizError('请填写修正说明')
 
-  const before: Record<string, unknown> = {
-    serviceDate: record.serviceDate,
-    startTime: record.startTime,
-    endTime: record.endTime,
-    location: record.location,
-    content: record.content,
+  try {
+    return await reviewApi.reviseRecord(recordId, {
+      serviceDate: input.serviceDate,
+      startTime: input.startTime,
+      endTime: input.endTime ?? undefined,
+      location: input.location,
+      content: input.content,
+      note: input.note.trim(),
+    })
+  } catch (err) {
+    wrapError(err)
   }
-
-  const next = { ...record }
-  if (input.serviceDate !== undefined) next.serviceDate = input.serviceDate
-  if (input.startTime !== undefined) next.startTime = input.startTime
-  if (input.endTime !== undefined) next.endTime = input.endTime
-  if (input.location !== undefined) next.location = input.location.trim()
-  if (input.content !== undefined) next.content = input.content.trim()
-
-  // 校验修正后的时间合法性
-  if (next.endTime) {
-    if (next.startTime === next.endTime) throw new BizError('结束时间不能与开始时间相同')
-  }
-
-  const after: Record<string, unknown> = {
-    serviceDate: next.serviceDate,
-    startTime: next.startTime,
-    endTime: next.endTime,
-    location: next.location,
-    content: next.content,
-  }
-
-  const changed = Object.keys(before).some((k) => before[k] !== after[k])
-  if (!changed) throw new BizError('未检测到任何修改')
-
-  const revision: RecordRevision = {
-    id: uid('rev'),
-    recordId,
-    operatorName,
-    revisedAt: new Date().toISOString(),
-    before,
-    after,
-    note: input.note.trim(),
-  }
-
-  const revisions = loadRevisions()
-  revisions.unshift(revision)
-  saveRevisions(revisions)
-
-  records[idx] = next
-  saveRecords(records)
-  return next
 }
 
-export function listRevisions(recordId: string): RecordRevision[] {
-  return loadRevisions().filter((r) => r.recordId === recordId)
+export async function listRevisions(recordId: string): Promise<RecordRevision[]> {
+  try {
+    return await reviewApi.listRevisions(recordId)
+  } catch (err) {
+    wrapError(err)
+  }
 }
 
 /* ============================================================
    核算（STA-01 ~ STA-03）
    ============================================================ */
 
-/** 计算单条记录的核算结果 */
+/** 计算单条记录的核算结果（纯逻辑，保持同步） */
 export function computeRecord(record: WorkRecord): BillingResult {
   return calculateBilling({
     billingMode: record.billingSnapshot.billingMode,
@@ -977,7 +627,7 @@ export function computeRecord(record: WorkRecord): BillingResult {
   })
 }
 
-/** 安全计算：异常时返回 0 金额结果，避免整页崩溃 */
+/** 安全计算：异常时返回 0 金额结果，避免整页崩溃（纯逻辑，保持同步） */
 export function computeRecordSafe(record: WorkRecord): BillingResult {
   try {
     return computeRecord(record)
@@ -998,129 +648,69 @@ export function computeRecordSafe(record: WorkRecord): BillingResult {
   }
 }
 
-export interface MonthlyReport {
-  monthKey: string
-  /** 汇总视图（STA-02） */
-  summary: MonthlySummary
-  /** 按员工汇总 */
-  byEmployee: Array<{
-    employeeId: string
-    employeeName: string
-    summary: MonthlySummary
-  }>
-  /** 按工作类型汇总 */
-  byWorkType: Array<{
-    workTypeId: string
-    workTypeName: string
-    billingMode: WorkType['billingMode']
-    summary: MonthlySummary
-  }>
-  /** 已确认记录明细 */
-  approvedRecords: WorkRecord[]
-  /** 未计入核算的条数（STA-03） */
-  pendingCount: number
-  rejectedCount: number
-}
+export type { MonthlyReport } from '@/api/report'
 
-/**
- * 生成月度报表（STA-01 / STA-02 / STA-03）
- * 仅「已确认」记录计入核算
- */
-export function buildMonthlyReport(filter?: {
+/** 生成月度报表（STA-01 / STA-02 / STA-03） */
+export async function buildMonthlyReport(filter?: {
   monthKey?: string
   employeeId?: string
   workTypeId?: string
-}): MonthlyReport {
-  const monthKey = filter?.monthKey ?? currentMonthKey()
-
-  const monthRecords = loadRecords().filter((r) => monthOf(r.serviceDate) === monthKey)
-
-  const scoped = monthRecords.filter((r) => {
-    if (filter?.employeeId && r.employeeId !== filter.employeeId) return false
-    if (filter?.workTypeId && r.workTypeId !== filter.workTypeId) return false
-    return true
-  })
-
-  const approved = scoped.filter((r) => r.status === 'APPROVED')
-  const pendingCount = scoped.filter((r) => r.status === 'PENDING').length
-  const rejectedCount = scoped.filter((r) => r.status === 'REJECTED').length
-
-  const summary = emptySummary()
-  const empMap = new Map<string, MonthlySummary>()
-  const typeMap = new Map<string, MonthlySummary>()
-
-  for (const record of approved) {
-    const result = computeRecordSafe(record)
-    accumulate(summary, result)
-
-    if (!empMap.has(record.employeeId)) empMap.set(record.employeeId, emptySummary())
-    accumulate(empMap.get(record.employeeId)!, result)
-
-    if (!typeMap.has(record.workTypeId)) typeMap.set(record.workTypeId, emptySummary())
-    accumulate(typeMap.get(record.workTypeId)!, result)
-  }
-
-  const byEmployee = [...empMap.entries()]
-    .map(([employeeId, s]) => ({
-      employeeId,
-      employeeName: getEmployeeName(employeeId),
-      summary: s,
-    }))
-    .sort((a, b) => b.summary.totalAmount - a.summary.totalAmount)
-
-  const byWorkType = [...typeMap.entries()]
-    .map(([workTypeId, s]) => {
-      const wt = getWorkType(workTypeId)
-      return {
-        workTypeId,
-        workTypeName: wt?.name ?? '未知类型',
-        billingMode: wt?.billingMode ?? ('BY_COUNT' as const),
-        summary: s,
-      }
+}): Promise<reportApi.MonthlyReport> {
+  try {
+    return await reportApi.getMonthlyReport({
+      month: filter?.monthKey ?? '',
+      employeeId: filter?.employeeId,
+      workTypeId: filter?.workTypeId,
     })
-    .sort((a, b) => b.summary.totalAmount - a.summary.totalAmount)
-
-  return {
-    monthKey,
-    summary,
-    byEmployee,
-    byWorkType,
-    approvedRecords: approved.sort((a, b) => {
-      if (a.serviceDate !== b.serviceDate) return a.serviceDate < b.serviceDate ? 1 : -1
-      return a.startTime < b.startTime ? 1 : -1
-    }),
-    pendingCount,
-    rejectedCount,
+  } catch (err) {
+    wrapError(err)
   }
 }
 
 /** 员工当月汇总（REC-05） */
-export function buildMyMonthlySummary(
-  employeeId: string,
-  monthKey: string,
-): {
+export async function buildMyMonthlySummary(monthKey: string): Promise<{
   summary: MonthlySummary
   pendingCount: number
   rejectedCount: number
   recordCount: number
-} {
-  const records = listMyRecords(employeeId, monthKey)
-  const approved = records.filter((r) => r.status === 'APPROVED')
-
-  const summary = emptySummary()
-  for (const record of approved) {
-    accumulate(summary, computeRecordSafe(record))
-  }
-
-  return {
-    summary,
-    pendingCount: records.filter((r) => r.status === 'PENDING').length,
-    rejectedCount: records.filter((r) => r.status === 'REJECTED').length,
-    recordCount: records.length,
+}> {
+  try {
+    const report = await reportApi.getMySummary(monthKey)
+    return {
+      summary: report.summary,
+      pendingCount: report.pendingCount,
+      rejectedCount: report.rejectedCount,
+      recordCount: report.approvedRecords.length,
+    }
+  } catch (err) {
+    wrapError(err)
   }
 }
 
 /** 待审核数量（用于角标） */
-export function countPending(): number {
-  return loadRecords().filter((r) => r.status === 'PENDING').length
+export async function countPending(): Promise<number> {
+  try {
+    const report = await reportApi.getMonthlyReport({ month: '' })
+    return report.pendingCount
+  } catch {
+    return 0
+  }
 }
+
+/* ============================================================
+   导出（STA-04）
+   ============================================================ */
+
+export async function exportMonthlyReport(monthKey: string): Promise<void> {
+  try {
+    await reportApi.exportMonthlyReport(monthKey)
+  } catch (err) {
+    wrapError(err)
+  }
+}
+
+/* ============================================================
+   兼容导出：保留 accumulate / emptySummary 供页面使用
+   ============================================================ */
+
+export { accumulate, emptySummary }

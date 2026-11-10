@@ -29,16 +29,21 @@ export function useAuth() {
     return result.employee
   }
 
-  function logout(): void {
-    serviceLogout()
+  async function logout(): Promise<void> {
+    await serviceLogout()
     currentUser.value = null
     bumpDataVersion()
   }
 
   /** 应用启动时恢复会话（LOG-03 无感进入） */
-  function restore(): void {
-    currentUser.value = restoreSession()
-    ready.value = true
+  async function restore(): Promise<void> {
+    try {
+      currentUser.value = await restoreSession()
+    } catch {
+      currentUser.value = null
+    } finally {
+      ready.value = true
+    }
   }
 
   /** 刷新当前用户信息（改密、改名后） */

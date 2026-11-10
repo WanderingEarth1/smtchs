@@ -5,7 +5,7 @@
  * 按需求：移动端只提供「查看详细记录数据、审核、金额汇总」三项能力，
  * 不含配置管理（员工/类型/单价/规则）与 Excel 导出。
  */
-import { computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import type { IconName } from '@/components/icons'
@@ -25,9 +25,23 @@ const tabs: Array<{ name: string; label: string; icon: IconName; to: string }> =
 
 const activeTab = computed(() => (route.meta.tab as string) ?? 'summary')
 
-const pendingCount = computed(() => {
-  void dataVersion.value
-  return countPending()
+const pendingCount = ref(0)
+
+/** 加载待审核数量（用于角标） */
+async function loadPendingCount(): Promise<void> {
+  try {
+    pendingCount.value = await countPending()
+  } catch {
+    pendingCount.value = 0
+  }
+}
+
+watch([dataVersion, () => route.path], () => {
+  void loadPendingCount()
+})
+
+onMounted(() => {
+  void loadPendingCount()
 })
 
 function go(to: string): void {
