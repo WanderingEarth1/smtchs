@@ -44,6 +44,14 @@ public class SmtEmployee extends BaseEntity
      */
     private String password;
 
+    /**
+     * 角色（EMPLOYEE 员工 / ADMIN 管理员）。
+     *
+     * <p>非 smt_employee 表列，由 {@code selectByAccount} 关联 sys_user 的
+     * 角色标识推导：拥有 admin 角色即为 ADMIN，否则为 EMPLOYEE。</p>
+     */
+    private String role;
+
     /** 删除标志（0存在 2删除） */
     private String delFlag;
 
@@ -125,6 +133,16 @@ public class SmtEmployee extends BaseEntity
     public void setPassword(String password)
     {
         this.password = password;
+    }
+
+    public String getRole()
+    {
+        return role;
+    }
+
+    public void setRole(String role)
+    {
+        this.role = role;
     }
 
     public String getDelFlag()
