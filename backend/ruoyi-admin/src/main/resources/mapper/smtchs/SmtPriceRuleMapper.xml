@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.smtchs.mapper.SmtPriceRuleMapper">
+
+    <resultMap id="SmtPriceRuleResult" type="com.ruoyi.smtchs.domain.SmtPriceRule">
+        <id     property="id"           column="id"/>
+        <result property="employeeId"   column="employee_id"/>
+        <result property="workTypeId"   column="work_type_id"/>
+        <result property="price"        column="price"/>
+        <result property="effectiveAt"  column="effective_at"/>
+        <result property="createBy"     column="create_by"/>
+        <result property="createTime"   column="create_time"/>
+        <result property="updateBy"     column="update_by"/>
+        <result property="updateTime"   column="update_time"/>
+        <result property="delFlag"      column="del_flag"/>
+        <result property="employeeName" column="employee_name"/>
+        <result property="workTypeName" column="work_type_name"/>
+    </resultMap>
+
+    <sql id="selectPriceRuleVo">
+        SELECT id, employee_id, work_type_id, price, effective_at,
+               create_by, create_time, update_by, update_time, del_flag
+        FROM smt_price_rule
+    </sql>
+
+    <select id="selectPriceRuleList" parameterType="com.ruoyi.smtchs.domain.SmtPriceRule" resultMap="SmtPriceRuleResult">
+        <include refid="selectPriceRuleVo"/>
+        <where>
+            del_flag = '0'
+            <if test="employeeId != null">
+                AND employee_id = #{employeeId}
+            </if>
+            <if test="workTypeId != null">
+                AND work_type_id = #{workTypeId}
+            </if>
+        </where>
+        ORDER BY employee_id ASC, work_type_id ASC
+    </select>
+
+    <select id="selectPriceRuleById" parameterType="java.lang.Long" resultMap="SmtPriceRuleResult">
+        <include refid="selectPriceRuleVo"/>
+        WHERE id = #{id}
+          AND del_flag = '0'
+    </select>
+
+    <!-- 取当前已生效的最新一条单价 -->
+    <select id="selectPrice" resultType="java.math.BigDecimal">
+        SELECT price
+        FROM smt_price_rule
+        WHERE employee_id = #{employeeId}
+          AND work_type_id = #{workTypeId}
+          AND del_flag = '0'
+          AND effective_at &lt;= NOW()
+        ORDER BY effective_at DESC
+        LIMIT 1
+    </select>
+
+    <!-- 完整单价矩阵：员工 × 工作类型 -->
+    <select id="selectMatrix" resultMap="SmtPriceRuleResult">
+        SELECT p.id,
+               p.employee_id,
+               p.work_type_id,
+               p.price,
+               p.effective_at,
+               p.create_by,
+               p.create_time,
+               p.update_by,
+               p.update_time,
+               p.del_flag,
+               e.name AS employee_name,
+               w.name AS work_type_name
+        FROM smt_price_rule p
+        LEFT JOIN smt_employee e ON e.id = p.employee_id AND e.del_flag = '0'
+        LEFT JOIN smt_work_type w ON w.id = p.work_type_id AND w.del_flag = '0'
+        WHERE p.del_flag = '0'
+        ORDER BY p.employee_id ASC, p.work_type_id ASC
+    </select>
+
+    <insert id="insertPriceRule" parameterType="com.ruoyi.smtchs.domain.SmtPriceRule"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO smt_price_rule (
+            employee_id, work_type_id, price, effective_at,
+            create_by, create_time, del_flag
+        ) VALUES (
+            #{employeeId}, #{workTypeId}, #{price}, IFNULL(#{effectiveAt}, NOW()),
+            #{createBy}, NOW(), '0'
+        )
+    </insert>
+
+    <!-- 依赖唯一键 uk_emp_type(employee_id, work_type_id) 实现存在即更新 -->
+    <insert id="upsertPrice" parameterType="com.ruoyi.smtchs.domain.SmtPriceRule"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO smt_price_rule (
+            employee_id, work_type_id, price, effective_at,
+            create_by, create_time, del_flag
+        ) VALUES (
+            #{employeeId}, #{workTypeId}, #{price}, IFNULL(#{effectiveAt}, NOW()),
+            #{createBy}, NOW(), '0'
+        )
+        ON DUPLICATE KEY UPDATE
+            price        = VALUES(price),
+            effective_at = VALUES(effective_at),
+            update_by    = #{updateBy},
+            update_time  = NOW(),
+            del_flag     = '0'
+    </insert>
+
+    <update id="updatePriceRule" parameterType="com.ruoyi.smtchs.domain.SmtPriceRule">
+        UPDATE smt_price_rule
+        <set>
+            <if test="employeeId != null">
+                employee_id = #{employeeId},
+            </if>
+            <if test="workTypeId != null">
+                work_type_id = #{workTypeId},
+            </if>
+            <if test="price != null">
+                price = #{price},
+            </if>
+            <if test="effectiveAt != null">
+                effective_at = #{effectiveAt},
+            </if>
+            <if test="updateBy != null">
+                update_by = #{updateBy},
+            </if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+          AND del_flag = '0'
+    </update>
+
+    <update id="deletePriceRuleById" parameterType="java.lang.Long">
+        UPDATE smt_price_rule
+        SET del_flag    = '2',
+            update_time = NOW()
+        WHERE id = #{id}
+          AND del_flag = '0'
+    </update>
+
+</mapper>
