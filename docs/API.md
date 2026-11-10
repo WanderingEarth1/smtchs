@@ -644,11 +644,13 @@ Content-Type: multipart/form-data
 | `smtchs:worktype:remove` | 删除类型 |
 | `smtchs:price:list` | 单价矩阵 |
 | `smtchs:price:edit` | 设置单价 |
+| `smtchs:config:list` | 查看计费配置（菜单级） |
 | `smtchs:config:edit` | 修改计费配置 |
 | `smtchs:record:list` | 全部记录 |
 | `smtchs:record:add` | 新增记录 |
 | `smtchs:record:edit` | 修改记录 |
 | `smtchs:record:remove` | 删除记录 |
+| `smtchs:review:list` | 审核列表（菜单级） |
 | `smtchs:review:approve` | 确认记录 |
 | `smtchs:review:reject` | 驳回记录 |
 | `smtchs:review:revise` | 修正记录 |

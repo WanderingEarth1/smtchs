@@ -5,8 +5,10 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.smtchs.domain.SmtWorkRecord;
 import com.ruoyi.smtchs.dto.RecordDraftDTO;
+import com.ruoyi.smtchs.service.ISmtEmployeeService;
 import com.ruoyi.smtchs.service.ISmtRecordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +33,9 @@ public class SmtRecordController extends BaseController
 {
     @Autowired
     private ISmtRecordService recordService;
+
+    @Autowired
+    private ISmtEmployeeService employeeService;
 
     /**
      * 查询当前员工的服务记录（REC-04）。
@@ -69,7 +74,19 @@ public class SmtRecordController extends BaseController
     @GetMapping("/{id}")
     public AjaxResult getInfo(@PathVariable Long id)
     {
-        return AjaxResult.success("操作成功", recordService.selectRecordById(id));
+        SmtWorkRecord record = recordService.selectRecordById(id);
+        if (record == null)
+        {
+            return AjaxResult.error("记录不存在");
+        }
+        // 归属校验：员工只能看自己的记录，管理员可看全部（防 IDOR）
+        Long currentEmployeeId = employeeService.getCurrentEmployeeId();
+        boolean isAdmin = SecurityUtils.isAdmin(SecurityUtils.getUserId());
+        if (!isAdmin && !record.getEmployeeId().equals(currentEmployeeId))
+        {
+            return AjaxResult.error("无权查看该记录");
+        }
+        return AjaxResult.success("操作成功", record);
     }
 
     /**
@@ -78,7 +95,7 @@ public class SmtRecordController extends BaseController
      * @param draft 记录草稿
      * @return 新增后的服务记录
      */
-    @PreAuthorize("@ss.hasPermi('smtchs:record:add')")
+    // 员工端 H5 是唯一调用方，权限由 Service 层「本人」校验保障，不挂管理端菜单权限
     @Log(title = "服务记录", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@RequestBody RecordDraftDTO draft)
@@ -96,7 +113,6 @@ public class SmtRecordController extends BaseController
      * @param draft 记录草稿
      * @return 修改后的服务记录
      */
-    @PreAuthorize("@ss.hasPermi('smtchs:record:edit')")
     @Log(title = "服务记录", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@RequestParam Long id, @RequestBody RecordDraftDTO draft)
@@ -110,7 +126,6 @@ public class SmtRecordController extends BaseController
      * @param id 记录ID
      * @return 成功结果
      */
-    @PreAuthorize("@ss.hasPermi('smtchs:record:remove')")
     @Log(title = "服务记录", businessType = BusinessType.DELETE)
     @DeleteMapping("/{id}")
     public AjaxResult remove(@PathVariable Long id)

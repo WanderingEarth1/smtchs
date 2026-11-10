@@ -57,6 +57,32 @@ public class SmtWorkRecord extends BaseEntity
 
     // 备注字段 remark 由 BaseEntity 提供，此处不再重复声明
 
+    /** 查询条件：月份（yyyy-MM），非数据库列 */
+    private String month;
+
+    /** 查询条件：关键词（流水号/地点/内容），非数据库列 */
+    private String keyword;
+
+    public String getMonth()
+    {
+        return month;
+    }
+
+    public void setMonth(String month)
+    {
+        this.month = month;
+    }
+
+    public String getKeyword()
+    {
+        return keyword;
+    }
+
+    public void setKeyword(String keyword)
+    {
+        this.keyword = keyword;
+    }
+
     /** 状态（PENDING待确认 APPROVED已确认 REJECTED已驳回） */
     private String status;
 

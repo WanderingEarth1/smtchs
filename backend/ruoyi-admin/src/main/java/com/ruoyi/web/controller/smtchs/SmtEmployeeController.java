@@ -102,11 +102,12 @@ public class SmtEmployeeController extends BaseController
     @DeleteMapping("/{id}")
     public AjaxResult remove(@PathVariable Long id)
     {
-        if (employeeService.deleteEmployee(id))
-        {
-            return success("该员工已有服务记录，已改为停用");
-        }
-        return success();
+        // deleteEmployee 返回 true 表示"因有历史记录改为停用"，
+        // 前端据 data.disabled 区分提示文案
+        boolean disabled = employeeService.deleteEmployee(id);
+        return AjaxResult.success(
+                disabled ? "该员工已有服务记录，已改为停用" : "删除成功",
+                Collections.singletonMap("disabled", disabled));
     }
 
     /**

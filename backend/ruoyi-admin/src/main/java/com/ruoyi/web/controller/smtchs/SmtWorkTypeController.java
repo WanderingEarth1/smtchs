@@ -96,10 +96,10 @@ public class SmtWorkTypeController extends BaseController
     @DeleteMapping("/{id}")
     public AjaxResult remove(@PathVariable Long id)
     {
-        if (workTypeService.deleteWorkType(id))
-        {
-            return success("该工作类型已被服务记录引用，已改为停用");
-        }
-        return success();
+        // deleteWorkType 返回 true 表示"因被记录引用改为停用"
+        boolean disabled = workTypeService.deleteWorkType(id);
+        return AjaxResult.success(
+                disabled ? "该类型已被服务记录引用，已改为停用" : "删除成功",
+                Collections.singletonMap("disabled", disabled));
     }
 }

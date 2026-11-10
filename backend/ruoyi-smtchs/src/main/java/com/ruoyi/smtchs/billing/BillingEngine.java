@@ -119,18 +119,19 @@ public final class BillingEngine {
         BigDecimal normalHours = toHours(normalMin);
         BigDecimal overtimeHours = toHours(overtimeMin);
 
+        // 金额计算：先乘后除，避免「先除再乘」的中间截断引入分位误差
+        // 反例：5 分钟 × 88.50 元/时，先除（截 10 位）再乘得 7.37499999 → 7.37，
+        //       前端全精度算出 7.375 → 7.38，差 1 分。先乘后除得 442.5/60 = 7.375 → 7.38，一致。
         BigDecimal normalAmount = BigDecimal.valueOf(normalMin)
-                .divide(MINUTES_PER_HOUR, RATE_SCALE, RoundingMode.HALF_UP)
                 .multiply(unitPrice)
-                .setScale(BillingResult.MONEY_SCALE, RoundingMode.HALF_UP);
+                .divide(MINUTES_PER_HOUR, BillingResult.MONEY_SCALE, RoundingMode.HALF_UP);
 
         BigDecimal overtimeMultiplier = input.getOvertimeMultiplier() == null
                 ? BigDecimal.ONE : input.getOvertimeMultiplier();
         BigDecimal overtimeAmount = BigDecimal.valueOf(overtimeMin)
-                .divide(MINUTES_PER_HOUR, RATE_SCALE, RoundingMode.HALF_UP)
                 .multiply(unitPrice)
                 .multiply(overtimeMultiplier)
-                .setScale(BillingResult.MONEY_SCALE, RoundingMode.HALF_UP);
+                .divide(MINUTES_PER_HOUR, BillingResult.MONEY_SCALE, RoundingMode.HALF_UP);
 
         BigDecimal total = normalAmount
                 .add(overtimeAmount)

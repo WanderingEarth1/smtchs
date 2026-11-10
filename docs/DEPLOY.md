@@ -64,7 +64,9 @@ mysql -u root -p ruoyi_smtchs < backend/sql/smtchs_data.sql
 mysql -u root -p ruoyi_smtchs < backend/sql/smtchs_menu.sql
 ```
 
-> `smtchs_menu.sql` **只能执行一次**，重复执行会因唯一约束报错。
+> `smtchs_menu.sql` 设计为**只执行一次**。`sys_menu` 没有针对 menu_name 的唯一约束，
+> 重复执行会静默插入重复菜单（不会报错），导致左侧菜单出现重复项。
+> 重跑前请先执行脚本头部的清理 SQL。
 
 ### 3.4 关联员工与若依用户
 
@@ -85,7 +87,7 @@ SELECT COUNT(*) FROM smt_employee;      -- 应为 4
 SELECT COUNT(*) FROM smt_work_type;     -- 应为 5
 SELECT COUNT(*) FROM smt_price_rule;    -- 应为 20
 SELECT COUNT(*) FROM smt_work_record;   -- 应为 18
-SELECT COUNT(*) FROM sys_menu WHERE perms LIKE 'smtchs:%';  -- 应为 22
+SELECT COUNT(*) FROM sys_menu WHERE perms LIKE 'smtchs:%';  -- 应为 24（7 菜单 + 17 按钮）
 ```
 
 ---
@@ -104,6 +106,11 @@ backend/
 ├── ruoyi-smtchs/       ← 本仓库已有
 └── ruoyi-admin/        ← 本仓库已有
 ```
+
+**注意**：本仓库的 `backend/ruoyi-admin/src/main/resources/` 已包含业务所需的
+`application.yml` / `application-druid.yml` / `logback.xml` / `mybatis/mybatis-config.xml`。
+从若依官方拷贝 `ruoyi-admin` 时，**不要覆盖这些文件**；若官方版本有额外的配置项
+（如 `application-dev.yml`、i18n 资源、静态资源），请合并而非替换。
 
 然后把 `backend/pom.xml` 的 `<modules>` 补全：
 
@@ -158,7 +165,7 @@ cd backend
 mvn clean package -DskipTests
 
 # 启动
-java -jar ruoyi-admin/target/ruoyi-admin.jar
+java -jar ruoyi-admin/target/ruoyi-admin-3.8.7.jar
 ```
 
 启动成功后访问 `http://localhost:8080`，默认账号 `admin / admin123`。
@@ -242,10 +249,13 @@ certbot --nginx -d h5.your-domain.com
 ### 6.1 获取若依前端
 
 ```bash
-git clone https://gitee.com/y_project/RuoYi-Vue3.git frontend-admin
-cd frontend-admin
-pnpm install
+# 注意：frontend-admin/ 目录已存在（内含 src/api/smtchs 与 src/views/smtchs），
+# 请克隆到临时目录后再合并，不要直接 clone 到该目录
+git clone https://gitee.com/y_project/RuoYi-Vue3.git /tmp/ruoyi-frontend
+cd /tmp/ruoyi-frontend && pnpm install
 ```
+
+然后把本仓库的 `frontend-admin/src/` 覆盖到 `/tmp/ruoyi-frontend/src/`（只覆盖同名业务目录）。
 
 ### 6.2 合并业务代码
 

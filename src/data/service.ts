@@ -18,7 +18,7 @@ import type {
   WorkType,
 } from '@/core/types'
 import { calculateBilling, accumulate, emptySummary, type MonthlySummary } from '@/core/billing'
-import { todayKey } from '@/core/date'
+import { currentMonthKey, todayKey } from '@/core/date'
 
 import * as authApi from '@/api/auth'
 import * as employeeApi from '@/api/employee'
@@ -28,6 +28,7 @@ import * as configApi from '@/api/config'
 import * as recordApi from '@/api/record'
 import * as reviewApi from '@/api/review'
 import * as reportApi from '@/api/report'
+import * as uploadApi from '@/api/upload'
 import { ApiError } from '@/api/request'
 
 /* ============================================================
@@ -100,9 +101,23 @@ export async function refreshPriceCache(): Promise<void> {
   }
 }
 
-/** 一次性刷新全部缓存（应用启动或登录后调用） */
+/**
+ * 一次性刷新全部缓存（应用启动或登录后调用）
+ *
+ * 员工角色没有 employee:list / price:list 权限，接口会返回 403。
+ * 这里逐项容错：某项失败只清空该项缓存，不影响登录与页面主流程。
+ */
 export async function refreshAllCaches(): Promise<void> {
-  await Promise.all([refreshEmployeeCache(), refreshWorkTypeCache(), refreshPriceCache()])
+  const tasks: Array<Promise<void>> = [
+    refreshWorkTypeCache(),
+    refreshEmployeeCache().catch(() => {
+      employeeCache = []
+    }),
+    refreshPriceCache().catch(() => {
+      priceCache = []
+    }),
+  ]
+  await Promise.all(tasks)
 }
 
 /* ============================================================
@@ -182,9 +197,16 @@ export async function updateEmployee(
   patch: Partial<Pick<Employee, 'name' | 'account' | 'status'>>,
 ): Promise<Employee> {
   try {
-    const emp = await employeeApi.updateEmployee({ id, ...patch })
+    await employeeApi.updateEmployee({
+      id,
+      name: patch.name,
+      account: patch.account,
+      status: patch.status === undefined ? undefined : patch.status === 'ACTIVE' ? '0' : '1',
+    })
     await refreshEmployeeCache()
-    return emp
+    const updated = employeeCache.find((e) => e.id === id)
+    if (!updated) throw new BizError('员工不存在或已被删除')
+    return updated
   } catch (err) {
     wrapError(err)
   }
@@ -248,9 +270,11 @@ export async function createWorkType(input: {
   billingMode: WorkType['billingMode']
 }): Promise<WorkType> {
   try {
-    const wt = await workTypeApi.createWorkType(input)
+    await workTypeApi.createWorkType(input)
     await refreshWorkTypeCache()
-    return wt
+    const created = workTypeCache.find((w) => w.name === input.name)
+    if (!created) throw new BizError('工作类型创建失败')
+    return created
   } catch (err) {
     wrapError(err)
   }
@@ -261,9 +285,11 @@ export async function updateWorkType(
   patch: Partial<Pick<WorkType, 'name' | 'billingMode' | 'enabled'>>,
 ): Promise<WorkType> {
   try {
-    const wt = await workTypeApi.updateWorkType({ id, ...patch })
+    await workTypeApi.updateWorkType({ id, ...patch })
     await refreshWorkTypeCache()
-    return wt
+    const updated = workTypeCache.find((w) => w.id === id)
+    if (!updated) throw new BizError('工作类型不存在或已被删除')
+    return updated
   } catch (err) {
     wrapError(err)
   }
@@ -305,8 +331,10 @@ export async function setUnitPrice(
   price: number,
 ): Promise<PriceRule> {
   try {
-    const rule = await priceApi.setUnitPrice(employeeId, workTypeId, price)
+    await priceApi.setUnitPrice(employeeId, workTypeId, price)
     await refreshPriceCache()
+    const rule = priceCache.find((p) => p.employeeId === employeeId && p.workTypeId === workTypeId)
+    if (!rule) throw new BizError('单价保存失败')
     return rule
   } catch (err) {
     wrapError(err)
@@ -339,7 +367,8 @@ export async function login(account: string, password: string): Promise<LoginRes
   try {
     const result = await authApi.login(account, password)
     localStorage.setItem('smtchs.token', result.token)
-    await refreshAllCaches()
+    // 缓存刷新失败（如员工无管理权限）不应阻断登录
+    await refreshAllCaches().catch(() => undefined)
     return { employee: result.user, token: result.token }
   } catch (err) {
     wrapError(err)
@@ -369,7 +398,7 @@ export async function restoreSession(): Promise<Employee | null> {
 
   try {
     const user = await authApi.getInfo()
-    await refreshAllCaches()
+    await refreshAllCaches().catch(() => undefined)
     return user
   } catch {
     localStorage.removeItem('smtchs.token')
@@ -451,8 +480,50 @@ export function validateDraft(draft: RecordDraft): Record<string, string> {
   return errors
 }
 
+/** base64 dataURL 转 File（用于提交前上传到后端） */
+function dataUrlToFile(dataUrl: string, fileName: string): File {
+  const commaIndex = dataUrl.indexOf(',')
+  const meta = commaIndex >= 0 ? dataUrl.slice(0, commaIndex) : ''
+  const base64 = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl
+  const mime = /:(.*?);/.exec(meta)?.[1] ?? 'image/jpeg'
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new File([bytes], fileName, { type: mime })
+}
+
+/**
+ * 把草稿里的本地照片上传到后端，返回可持久化的 URL 列表
+ *
+ * 已上传过的（dataUrl 以 / 或 http 开头的）直接复用，避免重复上传。
+ */
+async function uploadDraftPhotos(draft: RecordDraft): Promise<string[]> {
+  const urls: string[] = []
+  for (const photo of draft.photos) {
+    const src = photo.dataUrl
+    // 已经是服务端 URL，直接复用
+    if (src.startsWith('/') || src.startsWith('http')) {
+      urls.push(src)
+      continue
+    }
+    if (!src.startsWith('data:')) {
+      throw new BizError('照片数据异常，请重新拍摄')
+    }
+    const file = dataUrlToFile(src, photo.name || 'photo.jpg')
+    try {
+      const result = await uploadApi.uploadPhoto(file)
+      urls.push(result.url)
+    } catch (err) {
+      wrapError(err)
+    }
+  }
+  return urls
+}
+
 /** 把前端草稿转为 API 请求体 */
-function toApiDraft(draft: RecordDraft): recordApi.RecordDraft {
+function toApiDraft(draft: RecordDraft, photoUrls: string[]): recordApi.RecordDraft {
   return {
     workTypeId: draft.workTypeId,
     serviceDate: draft.serviceDate,
@@ -464,7 +535,7 @@ function toApiDraft(draft: RecordDraft): recordApi.RecordDraft {
     geoCaptured: draft.geoCaptured,
     content: draft.content.trim(),
     remark: draft.remark.trim(),
-    photoUrls: draft.photos.map((p) => p.dataUrl),
+    photoUrls,
   }
 }
 
@@ -474,7 +545,8 @@ export async function createRecord(draft: RecordDraft): Promise<WorkRecord> {
   if (firstError) throw new BizError(firstError)
 
   try {
-    return await recordApi.createRecord(toApiDraft(draft))
+    const photoUrls = await uploadDraftPhotos(draft)
+    return await recordApi.createRecord(toApiDraft(draft, photoUrls))
   } catch (err) {
     wrapError(err)
   }
@@ -486,7 +558,8 @@ export async function updateRecord(recordId: string, draft: RecordDraft): Promis
   if (firstError) throw new BizError(firstError)
 
   try {
-    return await recordApi.updateRecord(recordId, toApiDraft(draft))
+    const photoUrls = await uploadDraftPhotos(draft)
+    return await recordApi.updateRecord(recordId, toApiDraft(draft, photoUrls))
   } catch (err) {
     wrapError(err)
   }
@@ -589,7 +662,7 @@ export async function reviseRecord(
   if (!input.note.trim()) throw new BizError('请填写修正说明')
 
   try {
-    return await reviewApi.reviseRecord(recordId, {
+    await reviewApi.reviseRecord(recordId, {
       serviceDate: input.serviceDate,
       startTime: input.startTime,
       endTime: input.endTime ?? undefined,
@@ -597,6 +670,9 @@ export async function reviseRecord(
       content: input.content,
       note: input.note.trim(),
     })
+    const updated = await recordApi.getRecord(recordId)
+    if (!updated) throw new BizError('记录不存在')
+    return updated
   } catch (err) {
     wrapError(err)
   }
@@ -632,9 +708,10 @@ export function computeRecordSafe(record: WorkRecord): BillingResult {
   try {
     return computeRecord(record)
   } catch {
+    const mode = record?.billingSnapshot?.billingMode ?? 'BY_HOUR'
     return {
-      billingMode: record.billingSnapshot.billingMode,
-      count: record.billingSnapshot.billingMode === 'BY_COUNT' ? 1 : 0,
+      billingMode: mode,
+      count: mode === 'BY_COUNT' ? 1 : 0,
       normalHours: 0,
       overtimeHours: 0,
       normalAmount: 0,
@@ -690,7 +767,7 @@ export async function buildMyMonthlySummary(monthKey: string): Promise<{
 /** 待审核数量（用于角标） */
 export async function countPending(): Promise<number> {
   try {
-    const report = await reportApi.getMonthlyReport({ month: '' })
+    const report = await reportApi.getMonthlyReport({ month: currentMonthKey() })
     return report.pendingCount
   } catch {
     return 0

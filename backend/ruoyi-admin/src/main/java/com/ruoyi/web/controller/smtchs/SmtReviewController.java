@@ -4,7 +4,10 @@ import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.smtchs.dto.RevisionDTO;
+import com.ruoyi.smtchs.service.ISmtEmployeeService;
+import com.ruoyi.smtchs.service.ISmtRecordService;
 import com.ruoyi.smtchs.service.ISmtReviewService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,6 +32,12 @@ public class SmtReviewController extends BaseController
 {
     @Autowired
     private ISmtReviewService reviewService;
+
+    @Autowired
+    private ISmtRecordService recordService;
+
+    @Autowired
+    private ISmtEmployeeService employeeService;
 
     /**
      * 确认单条记录（AUD-02）。
@@ -100,6 +109,18 @@ public class SmtReviewController extends BaseController
     @GetMapping("/revisions/{id}")
     public AjaxResult revisions(@PathVariable Long id)
     {
+        // 归属校验：员工只能看自己记录的修正痕迹（防 IDOR）
+        SmtWorkRecord record = recordService.selectRecordById(id);
+        if (record == null)
+        {
+            return AjaxResult.error("记录不存在");
+        }
+        Long currentEmployeeId = employeeService.getCurrentEmployeeId();
+        boolean isAdmin = SecurityUtils.isAdmin(SecurityUtils.getUserId());
+        if (!isAdmin && !record.getEmployeeId().equals(currentEmployeeId))
+        {
+            return AjaxResult.error("无权查看该记录的修正痕迹");
+        }
         return AjaxResult.success("操作成功", reviewService.selectRevisions(id));
     }
 }

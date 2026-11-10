@@ -1,22 +1,30 @@
 /**
  * 单价矩阵接口
+ * 后端：SmtPriceController（/smtchs/price）
  */
-
 import { http } from './request'
 import type { PriceRule } from '@/core/types'
 
-export function getPriceMatrix(): Promise<PriceRule[]> {
-  return http.get<PriceRule[]>('/prices')
+/** 矩阵查询（返回全部单价规则） */
+export async function getPriceMatrix(): Promise<PriceRule[]> {
+  const list = await http.get<PriceRule[]>('/price/matrix')
+  return list || []
 }
 
-export function setUnitPrice(
+/** 设置单价 */
+export async function setUnitPrice(
   employeeId: string,
   workTypeId: string,
   price: number,
-): Promise<PriceRule> {
-  return http.put<PriceRule>('/prices', { employeeId, workTypeId, price })
+): Promise<void> {
+  await http.put('/price', { employeeId, workTypeId, price })
 }
 
-export function copyPriceRow(fromEmployeeId: string, toEmployeeIds: string[]): Promise<number> {
-  return http.post<number>('/prices/copy', { fromEmployeeId, toEmployeeIds })
+/** 按行复制 */
+export async function copyPriceRow(
+  fromEmployeeId: string,
+  toEmployeeIds: string[],
+): Promise<number> {
+  const count = await http.post<number>('/price/copy', { fromEmployeeId, toEmployeeIds })
+  return Number(count) || 0
 }

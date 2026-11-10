@@ -1,10 +1,17 @@
 package com.ruoyi.web.controller.smtchs;
 
+import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.core.domain.model.LoginUser;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.utils.ip.IpUtils;
+import com.ruoyi.framework.web.service.TokenService;
+import com.ruoyi.system.service.ISysPermissionService;
+import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.smtchs.domain.SmtEmployee;
 import com.ruoyi.smtchs.dto.ChangePasswordDTO;
 import com.ruoyi.smtchs.dto.LoginDTO;
@@ -21,13 +28,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Set;
 
 /**
  * 员工认证控制器（LOG-02 / LOG-04）。
  *
- * <p>原型阶段 token 仅用于前端会话占位，未接入若依的 JWT 过滤器链；
- * 真正的身份识别仍由若依 Spring Security 会话完成。</p>
+ * <p>登录成功后签发<b>若依真实 JWT</b>（{@link TokenService#createToken}），
+ * 前端携带 {@code Authorization: Bearer <token>} 即可通过
+ * {@code JwtAuthenticationTokenFilter} 与 {@code @PreAuthorize} 校验。
+ * 因此员工的 {@code smt_employee.user_id} 必须关联到 {@code sys_user}。</p>
  *
  * @author ruoyi
  */
@@ -43,6 +52,15 @@ public class SmtAuthController extends BaseController
     @Autowired
     private ISmtEmployeeService employeeService;
 
+    @Autowired
+    private ISysUserService sysUserService;
+
+    @Autowired
+    private ISysPermissionService permissionService;
+
+    @Autowired
+    private TokenService tokenService;
+
     /**
      * 账号密码登录（LOG-02）。
      *
@@ -52,19 +70,63 @@ public class SmtAuthController extends BaseController
      * @param dto 登录入参
      * @return 含 {@code token} 与 {@code user} 的登录结果
      */
+    @Anonymous
     @Log(title = "员工登录", businessType = BusinessType.OTHER, isSaveRequestData = false)
     @PostMapping("/login")
     public AjaxResult login(@RequestBody LoginDTO dto)
     {
         SmtEmployee employee = employeeService.login(dto.getAccount(), dto.getPassword());
 
-        // 原型阶段使用随机串占位，后续接入 JWT 时替换此处
-        String token = UUID.randomUUID().toString().replace("-", "");
+        // 签发若依真实 JWT；未关联 sys_user 时退化为仅返回用户信息（便于首次联调）
+        String token = issueToken(employee);
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("token", token);
         data.put("user", toUserView(employee));
         return AjaxResult.success("操作成功", data);
+    }
+
+    /**
+     * 为员工签发若依 JWT。
+     *
+     * <p>员工通过 {@code smt_employee.user_id} 关联 {@code sys_user}，
+     * 这里复用若依的用户 + 权限装配出 {@link LoginUser}，再由 {@link TokenService} 生成 token。
+     * 若未关联（user_id 为空或 sys_user 不存在），返回空串——此时前端只能停留在无权限页面，
+     * 部署时应按 DEPLOY.md「关联员工与若依用户」完成绑定。</p>
+     *
+     * @param employee 已通过密码校验的员工
+     * @return JWT 字符串；无法签发时返回空串
+     */
+    private String issueToken(SmtEmployee employee)
+    {
+        Long userId = employee.getUserId();
+        if (userId == null)
+        {
+            log.warn("员工 {} 未关联 sys_user，无法签发 JWT", employee.getAccount());
+            return "";
+        }
+
+        SysUser user = sysUserService.selectUserById(userId);
+        if (user == null)
+        {
+            log.warn("员工 {} 的 user_id={} 在 sys_user 中不存在，无法签发 JWT",
+                    employee.getAccount(), userId);
+            return "";
+        }
+
+        Set<String> permissions = permissionService.getMenuPermission(user);
+
+        LoginUser loginUser = new LoginUser();
+        loginUser.setUserId(user.getUserId());
+        loginUser.setDeptId(user.getDeptId());
+        loginUser.setUser(user);
+        loginUser.setPermissions(permissions);
+
+        // 记录登录信息（用于若依「在线用户」与登录日志）
+        loginUser.setIpaddr(IpUtils.getIpAddr());
+        loginUser.setLoginLocation("内网IP");
+
+        return tokenService.createToken(loginUser);
     }
 
     /**

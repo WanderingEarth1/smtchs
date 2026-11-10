@@ -109,6 +109,18 @@
             <if test="params != null and params.endServiceDate != null and params.endServiceDate != ''">
                 AND r.service_date &lt;= #{params.endServiceDate}
             </if>
+            <!-- 月份筛选：yyyy-MM -->
+            <if test="month != null and month != ''">
+                AND DATE_FORMAT(r.service_date, '%Y-%m') = #{month}
+            </if>
+            <!-- 关键词：流水号 / 地点 / 工作内容 -->
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    r.serial_no LIKE CONCAT('%', #{keyword}, '%')
+                    OR r.location LIKE CONCAT('%', #{keyword}, '%')
+                    OR r.content LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
         </where>
         ORDER BY r.service_date DESC, r.start_time DESC, r.id DESC
     </select>
