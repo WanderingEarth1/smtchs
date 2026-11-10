@@ -337,10 +337,23 @@
           AND del_flag = '0'
     </update>
 
+    <!-- 修正已确认记录：固定 SET 列表，可把 end_time 显式置空；状态与审核痕迹保持不变 -->
+    <update id="updateRecordForRevision" parameterType="com.ruoyi.smtchs.domain.SmtWorkRecord">
+        UPDATE smt_work_record
+        SET service_date = #{serviceDate},
+            start_time   = #{startTime},
+            end_time     = #{endTime},
+            location     = #{location},
+            content      = #{content},
+            update_by    = #{updateBy},
+            update_time  = NOW()
+        WHERE id = #{id}
+          AND del_flag = '0'
+    </update>
+
     <!-- 新增记录照片 -->
     <insert id="insertPhoto" parameterType="com.ruoyi.smtchs.domain.SmtRecordPhoto"
-            useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO smt_record_photo (
+            useGeneratedKeys="true" keyProperty="id">        INSERT INTO smt_record_photo (
             record_id, url, `sort`, `size`, create_time
         ) VALUES (
             #{recordId}, #{url}, IFNULL(#{sort}, 0), IFNULL(#{size}, 0), NOW()

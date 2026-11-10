@@ -225,11 +225,18 @@ public class SmtReviewServiceImpl implements ISmtReviewService
         }
         if (dto.getStartTime() != null)
         {
-            record.setStartTime(dto.getStartTime().trim());
+            String startTime = dto.getStartTime().trim();
+            if (startTime.isEmpty())
+            {
+                throw new ServiceException("开始时间不能为空");
+            }
+            record.setStartTime(startTime);
         }
         if (dto.getEndTime() != null)
         {
-            record.setEndTime(dto.getEndTime().trim());
+            // 空白归一为 null，避免把空串写入 end_time
+            String endTime = dto.getEndTime().trim();
+            record.setEndTime(endTime.isEmpty() ? null : endTime);
         }
         if (dto.getLocation() != null)
         {
@@ -283,7 +290,8 @@ public class SmtReviewServiceImpl implements ISmtReviewService
         revisionMapper.insertRevision(revision);
 
         record.setUpdateBy(SecurityUtils.getUsername());
-        recordMapper.updateRecord(record);
+        // 使用固定 SET 列表的语句，保证能把 end_time 显式置空
+        recordMapper.updateRecordForRevision(record);
 
         log.info("修正已确认记录 id={}，说明={}，操作人={}",
                 recordId, note, SecurityUtils.getUsername());

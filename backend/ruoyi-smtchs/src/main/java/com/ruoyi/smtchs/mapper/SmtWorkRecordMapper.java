@@ -70,6 +70,17 @@ public interface SmtWorkRecordMapper
     int updateRecordForResubmit(SmtWorkRecord record);
 
     /**
+     * 修正已确认记录：只覆盖 5 个可编辑字段，保持状态与审核痕迹不变。
+     *
+     * <p>使用固定 SET 列表，保证能把 {@code end_time} 显式置空；
+     * {@link #updateRecord} 的动态 {@code <if>} 无法写入 null。</p>
+     *
+     * @param record 服务记录
+     * @return 影响行数
+     */
+    int updateRecordForRevision(SmtWorkRecord record);
+
+    /**
      * 新增记录照片。
      *
      * @param photo 照片
