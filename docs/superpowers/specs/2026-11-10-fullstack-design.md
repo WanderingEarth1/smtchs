@@ -73,7 +73,11 @@
 
 ### 技术约束
 
-- 若依版本：**RuoYi-Vue3**（Spring Boot 3.x + Vue3 + Element Plus + Vite）
+- 若依版本：**RuoYi-Vue3 v3.8.7**（Spring Boot 2.5.15 + Java 1.8 + Vue3 + Element Plus + Vite）
+
+> **勘误**：初版设计文档写「Spring Boot 3」，经核实若依 v3.8.7 官方后端为 Spring Boot 2.5.15 + Java 1.8。
+> 本实现已按实际版本对齐：使用 `javax.servlet` 而非 `jakarta.servlet`，
+> 方法级安全用 `@EnableGlobalMethodSecurity` 而非 `@EnableMethodSecurity`。
 - 若依默认使用 MyBatis（XML 映射），本项目沿用，不引入 MyBatis-Plus 以免与若依脚手架冲突
 - 若依自带 `sys_user` / `sys_role` 等权限表，业务表独立建，通过 `user_id` 关联
 
