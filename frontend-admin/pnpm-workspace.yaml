@@ -1,7 +1,6 @@
-allowBuilds:
-  '@parcel/watcher': set this to true or false
-  esbuild: set this to true or false
-  vue-demi: set this to true or false
+# 允许这些依赖执行安装脚本（Vite / Vue 生态必需）
+# 不批准会导致 vite 无法启动、vue-demi 类型解析失败
 onlyBuiltDependencies:
   - esbuild
   - vue-demi
+  - '@parcel/watcher'

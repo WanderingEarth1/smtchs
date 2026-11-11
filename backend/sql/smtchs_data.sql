@@ -15,8 +15,8 @@ SET NAMES utf8mb4;
 START TRANSACTION;
 
 -- =============================================================================
--- 1. 员工档案 smt_employee（4 条）
---    张三 / 李四 / 王五 为启用状态（status='0'），赵六 为停用状态（status='1'）
+-- 1. 员工档案 smt_employee（5 条）
+--    张三 / 李四 / 王五 / 管理员 为启用状态（status='0'），赵六 为停用状态（status='1'）
 --    user_id 统一留空，若依 sys_user 关联由后续步骤处理
 -- =============================================================================
 INSERT INTO `smt_employee`
@@ -26,7 +26,9 @@ VALUES
   (NULL, '张三', 'zhangsan', '0', 0, NULL, 'admin', NOW(), '', NULL, '0'),
   (NULL, '李四', 'lisi',     '0', 0, NULL, 'admin', NOW(), '', NULL, '0'),
   (NULL, '王五', 'wangwu',   '0', 0, NULL, 'admin', NOW(), '', NULL, '0'),
-  (NULL, '赵六', 'zhaoliu',  '1', 0, NULL, 'admin', NOW(), '', NULL, '0');
+  (NULL, '赵六', 'zhaoliu',  '1', 0, NULL, 'admin', NOW(), '', NULL, '0'),
+  -- 管理员账号：管理员也可能上门服务，需有员工档案才能创建工单
+  (NULL, '管理员', 'admin',  '0', 0, NULL, 'admin', NOW(), '', NULL, '0');
 
 -- =============================================================================
 -- 2. 工作类型 smt_work_type（5 条）
