@@ -100,7 +100,14 @@ mysql -u root -p ruoyi_smtchs < backend/sql/ry_20260417.sql
 mysql -u root -p ruoyi_smtchs < backend/sql/smtchs_schema.sql
 mysql -u root -p ruoyi_smtchs < backend/sql/smtchs_data.sql
 mysql -u root -p ruoyi_smtchs < backend/sql/smtchs_menu.sql
+
+# 绑定员工账号到若依用户体系（必须执行，否则无法登录）
+mysql -u root -p ruoyi_smtchs < backend/sql/smtchs_bind_users.sql
 ```
+
+> `smtchs_bind_users.sql` 会为每个员工创建对应的 `sys_user`、分配角色、授予菜单权限，
+> 并回填 `smt_employee.user_id`。脚本幂等，可重复执行。
+> 默认密码统一为 `123456`，**生产环境请执行后立即修改**。
 
 ### 2. 后端
 
@@ -144,7 +151,7 @@ pnpm dev
 | 员工 | `zhangsan` / `lisi` / `wangwu` | `123456` | 员工端 H5 |
 | 管理员 | `admin` | `admin123` | 管理端 PC / 移动 |
 
-> 首次登录前需把 `smt_employee.user_id` 关联到 `sys_user.user_id`，详见 `docs/DEPLOY.md`。
+> 账号由 `smtchs_bind_users.sql` 自动创建并绑定，无需手动操作。
 
 ---
 
