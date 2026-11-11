@@ -1,67 +1,86 @@
 /**
  * 业务页面通用样式
  *
- * 目的：让 smtchs 业务页面在若依框架内保持一致的排版密度：
- * - 操作列按钮有明确间距，不挤在一起
- * - 表格行高收紧，信息密度更高
- * - 表格撑满剩余高度，下方不留大片空白
+ * 设计目标：让 PC 端视觉向 H5 端靠拢
+ * - 圆角：卡片 14px（H5 --radius-lg）、大卡 20px（H5 --radius-xl）
+ * - 阴影：柔和双层阴影（H5 --shadow-sm / --shadow-md）
+ * - 间距：4/8 节奏，区块 16px
+ * - 主数字：深色渐变块 + 大号 tabular 数字
  */
 
-/* ---------- 操作列按钮 ---------- */
-/* el-button 默认给相邻按钮加 margin-left，这里统一改为 gap 控制 */
-.el-table .cell > .el-button.op-btn {
+/* ============ 设计令牌（对齐 H5） ============ */
+:root {
+  --smt-radius-sm: 6px;
+  --smt-radius-md: 10px;
+  --smt-radius-lg: 14px;
+  --smt-radius-xl: 20px;
+  --smt-radius-full: 999px;
+
+  --smt-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --smt-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04);
+  --smt-shadow-md: 0 2px 4px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(15, 23, 42, 0.07);
+
+  --smt-gap-xs: 4px;
+  --smt-gap-sm: 8px;
+  --smt-gap-md: 16px;
+  --smt-gap-lg: 24px;
+}
+
+/* ============ 页面容器 ============ */
+.app-container {
+  padding: 16px 20px 24px;
+}
+
+/* ============ 卡片 ============ */
+.app-container .el-card {
+  border-radius: var(--smt-radius-lg);
+  border-color: var(--el-border-color-lighter);
+  box-shadow: var(--smt-shadow-xs);
+}
+
+.app-container .el-card__header {
+  padding: 12px 16px;
+  border-bottom-color: var(--el-border-color-lighter);
+  font-weight: 600;
+}
+
+.app-container .el-card__body {
+  padding: 16px;
+}
+
+/* ============ 表格 ============ */
+.app-container .el-table {
+  font-size: 13px;
+  border-radius: var(--smt-radius-md);
+  overflow: hidden;
+}
+
+.app-container .el-table th.el-table__cell {
+  background-color: var(--el-fill-color-light);
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  padding: 9px 0;
+}
+
+.app-container .el-table td.el-table__cell {
+  padding: 8px 0;
+}
+
+.app-container .el-table .cell {
+  line-height: 1.5;
+}
+
+/* 操作列按钮：用相邻选择器控制间距，避免 el-button 默认 margin 叠加 */
+.app-container .el-table .cell > .el-button.op-btn {
   margin-left: 0 !important;
   margin-right: 0 !important;
 }
 
-/* 用 inline-flex + gap 排布操作按钮，兼容性优于 :has() */
-.el-table .cell > .el-button.op-btn:first-child {
-  margin-left: 0 !important;
-}
-
-.el-table .cell > .el-button.op-btn + .el-button.op-btn {
+.app-container .el-table .cell > .el-button.op-btn + .el-button.op-btn {
   margin-left: 12px !important;
 }
 
-/* ---------- 表格密度 ---------- */
-.app-container {
-  .el-table {
-    font-size: 13px;
-  }
-
-  .el-table th.el-table__cell {
-    background-color: var(--el-fill-color-light);
-    font-weight: 600;
-    color: var(--el-text-color-primary);
-    padding: 8px 0;
-  }
-
-  .el-table td.el-table__cell {
-    padding: 7px 0;
-  }
-
-  .el-table .cell {
-    line-height: 1.5;
-  }
-
-  /* 搜索栏与表格之间收紧 */
-  .el-form--inline {
-    margin-bottom: 4px;
-  }
-
-  /* 操作栏与表格之间收紧 */
-  .mb8 {
-    margin-bottom: 8px !important;
-  }
-
-  /* 分页贴底，与表格留出呼吸空间 */
-  .el-pagination {
-    margin-top: 12px;
-  }
-}
-
-/* ---------- 空数据态 ---------- */
-/* 表格无数据时不要把整屏撑满，避免大片空白 */
+/* 空数据态：不要撑满整屏 */
 .app-container .el-table__empty-block {
   min-height: 180px;
 }
@@ -69,4 +88,87 @@
 .app-container .el-table__empty-text {
   font-size: 13px;
   color: var(--el-text-color-placeholder);
+}
+
+/* ============ 搜索栏 ============ */
+.app-container .el-form--inline {
+  margin-bottom: 4px;
+}
+
+.app-container .el-form--inline .el-form-item {
+  margin-bottom: 12px;
+}
+
+/* ============ 操作栏 ============ */
+.app-container .mb8 {
+  margin-bottom: 8px !important;
+}
+
+/* ============ 分页 ============ */
+.app-container .el-pagination {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+/* ============ 按钮 ============ */
+.app-container .el-button {
+  border-radius: var(--smt-radius-sm);
+}
+
+.app-container .el-button--small {
+  border-radius: var(--smt-radius-sm);
+}
+
+/* ============ 标签 ============ */
+.app-container .el-tag {
+  border-radius: var(--smt-radius-sm);
+}
+
+/* ============ 弹窗 ============ */
+.el-dialog {
+  border-radius: var(--smt-radius-lg);
+}
+
+.el-dialog__header {
+  padding: 16px 20px 12px;
+  margin-right: 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.el-dialog__body {
+  padding: 20px;
+}
+
+.el-dialog__footer {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+/* ============ 抽屉 ============ */
+.el-drawer__header {
+  padding: 16px 20px 12px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  font-weight: 600;
+}
+
+.el-drawer__body {
+  padding: 20px;
+}
+
+/* ============ 描述列表 ============ */
+.el-descriptions__label {
+  font-weight: 600;
+  color: var(--el-text-color-secondary);
+}
+
+/* ============ 深色模式适配 ============ */
+html.dark {
+  .app-container .el-card {
+    box-shadow: none;
+  }
+
+  .app-container .el-table th.el-table__cell {
+    background-color: var(--el-fill-color-darker);
+  }
 }

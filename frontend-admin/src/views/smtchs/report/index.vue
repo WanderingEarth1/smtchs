@@ -30,37 +30,35 @@
       style="margin-bottom: 16px"
     />
 
-    <!-- 汇总卡片 -->
-    <el-row :gutter="16" style="margin-bottom: 16px" v-loading="loading">
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="stat-label">提成总额</div>
-          <div class="stat-value primary">¥{{ formatMoney(report?.summary?.totalAmount) }}</div>
-          <div class="stat-hint">{{ report?.approvedRecords?.length || 0 }} 条已确认计入</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="stat-label">按次次数</div>
-          <div class="stat-value">{{ report?.summary?.countTotal || 0 }} 次</div>
-          <div class="stat-hint">按次金额 ¥{{ formatMoney(report?.summary?.byCountAmount) }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="stat-label">正常总时长</div>
-          <div class="stat-value">{{ formatHours(report?.summary?.normalHoursTotal) }}</div>
-          <div class="stat-hint">按时金额 ¥{{ formatMoney(report?.summary?.byHourAmount) }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="stat-label">加班总时长</div>
-          <div class="stat-value warning">{{ formatHours(report?.summary?.overtimeHoursTotal) }}</div>
-          <div class="stat-hint">已按加班倍率计费</div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <!-- 汇总卡片：对齐 H5 的指标卡风格 -->
+    <div class="smt-metrics" v-loading="loading">
+      <div class="smt-metrics__lead">
+        <span class="smt-metrics__lead-label">提成总额</span>
+        <p class="smt-metrics__lead-value">
+          <em>¥</em>{{ formatMoney(report?.summary?.totalAmount) }}
+        </p>
+        <span class="smt-metrics__lead-foot">
+          {{ report?.approvedRecords?.length || 0 }} 条已确认计入
+        </span>
+      </div>
+      <div class="smt-metrics__grid">
+        <div class="smt-metrics__cell">
+          <span class="smt-metrics__cell-k">按次次数</span>
+          <span class="smt-metrics__cell-v">{{ report?.summary?.countTotal || 0 }}<em>次</em></span>
+          <span class="smt-metrics__cell-f">¥{{ formatMoney(report?.summary?.byCountAmount) }}</span>
+        </div>
+        <div class="smt-metrics__cell">
+          <span class="smt-metrics__cell-k">正常时长</span>
+          <span class="smt-metrics__cell-v">{{ formatHours(report?.summary?.normalHoursTotal) }}</span>
+          <span class="smt-metrics__cell-f">按时计费</span>
+        </div>
+        <div class="smt-metrics__cell">
+          <span class="smt-metrics__cell-k">加班时长</span>
+          <span class="smt-metrics__cell-v is-warn">{{ formatHours(report?.summary?.overtimeHoursTotal) }}</span>
+          <span class="smt-metrics__cell-f">已按倍率</span>
+        </div>
+      </div>
+    </div>
 
     <!-- 按员工汇总 -->
     <el-card shadow="never" style="margin-bottom: 16px">
@@ -226,26 +224,116 @@ loadReport()
 </script>
 
 <style scoped>
-.stat-label {
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 6px;
+/* ---------- 指标区（对齐 H5） ---------- */
+.smt-metrics {
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--smt-radius-lg);
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: var(--smt-shadow-xs);
 }
-.stat-value {
-  font-size: 24px;
+
+@media (min-width: 900px) {
+  .smt-metrics {
+    grid-template-columns: minmax(260px, 0.85fr) 2.4fr;
+  }
+}
+
+.smt-metrics__lead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 18px 22px;
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(56, 189, 248, 0.18), transparent 60%),
+    linear-gradient(160deg, #0b1220 0%, #16294c 100%);
+  color: #fff;
+}
+
+.smt-metrics__lead-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.smt-metrics__lead-value {
+  margin: 4px 0 0;
+  font-size: 32px;
   font-weight: 700;
-  color: #303133;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
-.stat-value.primary {
-  color: #409eff;
+
+.smt-metrics__lead-value em {
+  font-style: normal;
+  font-size: 16px;
+  font-weight: 500;
+  opacity: 0.6;
+  margin-right: 2px;
 }
-.stat-value.warning {
-  color: #e6a23c;
+
+.smt-metrics__lead-foot {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
 }
-.stat-hint {
+
+.smt-metrics__grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 700px) {
+  .smt-metrics__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.smt-metrics__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 20px;
+  border-left: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.smt-metrics__cell-k {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--el-text-color-secondary);
+}
+
+.smt-metrics__cell-v {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: var(--el-text-color-primary);
+}
+
+.smt-metrics__cell-v.is-warn {
+  color: var(--el-color-warning);
+}
+
+.smt-metrics__cell-v em {
+  font-style: normal;
   font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
+  font-weight: 500;
+  margin-left: 2px;
+  opacity: 0.6;
 }
+
+.smt-metrics__cell-f {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+}
+
 </style>

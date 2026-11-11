@@ -375,9 +375,9 @@ onMounted(loadData)
 .smt-dash {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--smt-gap-md);
   /* 若依 app-main 默认无内边距，这里补上，避免内容贴边 */
-  padding: 16px 20px 24px;
+  padding: var(--smt-gap-md) 20px var(--smt-gap-lg);
 }
 
 /* ---------- 页头 ---------- */
@@ -452,8 +452,9 @@ onMounted(loadData)
   grid-template-columns: 1fr;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
+  border-radius: var(--smt-radius-lg);
   overflow: hidden;
+  box-shadow: var(--smt-shadow-xs);
 }
 
 @media (min-width: 900px) {
@@ -569,7 +570,7 @@ onMounted(loadData)
   width: 100%;
   padding: 10px 14px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--smt-radius-md);
   background: var(--el-fill-color-light);
   cursor: pointer;
   text-align: left;
@@ -649,8 +650,9 @@ onMounted(loadData)
 .smt-panel {
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
+  border-radius: var(--smt-radius-lg);
   overflow: hidden;
+  box-shadow: var(--smt-shadow-xs);
 }
 
 .smt-sec-head {
@@ -773,7 +775,7 @@ onMounted(loadData)
   justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: 5px;
+  border-radius: var(--smt-radius-sm);
   background: var(--el-fill-color);
   font-size: 11px;
   font-weight: 700;

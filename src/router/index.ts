@@ -76,6 +76,12 @@ const router = createRouter({
           meta: { title: '详细记录', tab: 'records' },
         },
         {
+          path: 'profile',
+          name: 'admin-m-profile',
+          component: () => import('@/views/admin-mobile/ProfileView.vue'),
+          meta: { title: '我的', tab: 'profile' },
+        },
+        {
           path: 'review',
           name: 'admin-m-review',
           component: () => import('@/views/admin-mobile/ReviewView.vue'),

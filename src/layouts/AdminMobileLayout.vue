@@ -21,6 +21,7 @@ const tabs: Array<{ name: string; label: string; icon: IconName; to: string }> =
   { name: 'summary', label: '汇总', icon: 'chart', to: '/a/m/summary' },
   { name: 'records', label: '记录', icon: 'list', to: '/a/m/records' },
   { name: 'review', label: '审核', icon: 'check-circle', to: '/a/m/review' },
+  { name: 'profile', label: '我的', icon: 'user', to: '/a/m/profile' },
 ]
 
 const activeTab = computed(() => (route.meta.tab as string) ?? 'summary')
