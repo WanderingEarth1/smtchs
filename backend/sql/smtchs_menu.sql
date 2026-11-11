@@ -122,12 +122,12 @@ INSERT INTO `sys_menu`
  `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`,
  `update_by`, `update_time`, `remark`)
 VALUES
-('计费规则', @parentId, 4, 'config', 'smtchs/config/index', '', 1, 0,
+('计费规则', @parentId, 4, 'billing-rule', 'smtchs/config/index', '', 1, 0,
  'C', '0', '0', 'smtchs:config:list', 'edit', 'admin', NOW(),
  '', NULL, '加班起算时间 / 倍率 / 取整规则配置菜单');
 
 SET @configMenuId = (SELECT `menu_id` FROM `sys_menu`
-                     WHERE `path` = 'config' AND `parent_id` = @parentId LIMIT 1);
+                     WHERE `path` = 'billing-rule' AND `parent_id` = @parentId LIMIT 1);
 
 INSERT INTO `sys_menu`
 (`menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `is_frame`, `is_cache`,

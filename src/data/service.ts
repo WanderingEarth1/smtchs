@@ -83,12 +83,16 @@ export async function refreshEmployeeCache(): Promise<void> {
   }
 }
 
-/** 刷新工作类型缓存 */
+/**
+ * 刷新工作类型缓存
+ *
+ * 管理员走 /worktype/list（含停用）；员工无该权限时降级到 /worktype/enabled。
+ */
 export async function refreshWorkTypeCache(): Promise<void> {
   try {
     workTypeCache = await workTypeApi.listWorkTypes()
-  } catch (err) {
-    wrapError(err)
+  } catch {
+    workTypeCache = await workTypeApi.listEnabledWorkTypes()
   }
 }
 
@@ -117,16 +121,19 @@ export async function refreshPriceCache(): Promise<void> {
  * 这里逐项容错：某项失败只清空该项缓存，不影响登录与页面主流程。
  */
 export async function refreshAllCaches(): Promise<void> {
-  const tasks: Array<Promise<void>> = [
-    refreshWorkTypeCache(),
+  // 逐项容错：员工角色没有 employee:list / price:list 权限，
+  // 任一接口 403 都不能让整个登录/恢复流程失败。
+  await Promise.all([
+    refreshWorkTypeCache().catch(() => {
+      workTypeCache = []
+    }),
     refreshEmployeeCache().catch(() => {
       employeeCache = []
     }),
     refreshPriceCache().catch(() => {
       priceCache = []
     }),
-  ]
-  await Promise.all(tasks)
+  ])
 }
 
 /* ============================================================

@@ -33,15 +33,15 @@
     <el-table v-loading="loading" :data="list" height="calc(100vh - 420px)" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="50" :selectable="row => row.status === 'PENDING'" />
       <el-table-column label="员工" prop="employeeName" min-width="100" show-overflow-tooltip />
-      <el-table-column label="工作类型" prop="workTypeName" min-width="120" show-overflow-tooltip />
-      <el-table-column label="日期" prop="serviceDate" min-width="120" />
-      <el-table-column label="时间" min-width="150">
+      <el-table-column label="工作类型" prop="workTypeName" min-width="105" show-overflow-tooltip />
+      <el-table-column label="日期" prop="serviceDate" min-width="105" />
+      <el-table-column label="时间" min-width="120">
         <template #default="scope">
           {{ scope.row.startTime }}<span v-if="scope.row.endTime">~{{ scope.row.endTime }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="地点" prop="location" show-overflow-tooltip min-width="150" />
-      <el-table-column label="工作内容" prop="content" show-overflow-tooltip min-width="160" />
+      <el-table-column label="地点" prop="location" show-overflow-tooltip min-width="130" />
+      <el-table-column label="工作内容" prop="content" show-overflow-tooltip min-width="130" />
       <el-table-column label="状态" width="110" align="center">
         <template #default="scope">
           <el-tag :type="statusType(scope.row.status)" size="small">{{ statusText(scope.row.status) }}</el-tag>
@@ -53,7 +53,7 @@
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="230" fixed="right" align="center">
+      <el-table-column label="操作" width="210" fixed="right" align="center">
         <template #default="scope">
           <template v-if="scope.row.status === 'PENDING'">
             <el-button link type="success" class="op-btn" @click="handleApprove(scope.row)" v-hasPermi="['smtchs:review:approve']">确认</el-button>

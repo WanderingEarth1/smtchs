@@ -33,10 +33,10 @@
     <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" style="margin-bottom: 12px"></right-toolbar>
 
     <el-table v-loading="loading" :data="list" height="calc(100vh - 400px)" @row-click="handleView">
-      <el-table-column label="流水号" prop="serialNo" min-width="160" show-overflow-tooltip />
+      <el-table-column label="流水号" prop="serialNo" min-width="150" show-overflow-tooltip />
       <el-table-column label="员工" prop="employeeName" min-width="100" show-overflow-tooltip />
-      <el-table-column label="日期" prop="serviceDate" min-width="120" />
-      <el-table-column label="工作类型" prop="workTypeName" min-width="120" show-overflow-tooltip />
+      <el-table-column label="日期" prop="serviceDate" min-width="110" />
+      <el-table-column label="工作类型" prop="workTypeName" min-width="110" show-overflow-tooltip />
       <el-table-column label="计费模式" width="110" align="center">
         <template #default="scope">
           <el-tag :type="scope.row.snapBillingMode === 'BY_HOUR' ? 'warning' : 'success'" size="small">
@@ -44,12 +44,12 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="时间" min-width="150">
+      <el-table-column label="时间" min-width="130">
         <template #default="scope">
           {{ scope.row.startTime }}<span v-if="scope.row.endTime">~{{ scope.row.endTime }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="地点" prop="location" show-overflow-tooltip min-width="160" />
+      <el-table-column label="地点" prop="location" show-overflow-tooltip min-width="140" />
       <el-table-column label="状态" width="110" align="center">
         <template #default="scope">
           <el-tag :type="statusType(scope.row.status)" size="small">{{ statusText(scope.row.status) }}</el-tag>
