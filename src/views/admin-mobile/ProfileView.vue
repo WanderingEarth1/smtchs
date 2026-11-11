@@ -294,8 +294,9 @@ const aboutOpen = ref(false)
 .m-profile {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
-  padding-bottom: calc(var(--tabbar-height) + var(--space-lg));
+  gap: var(--space-sm);
+  /* 底部只留 tabbar 高度，避免多余空白导致小屏溢出 */
+  padding-bottom: calc(var(--tabbar-height) + var(--space-sm));
 }
 
 /* ---------- 页头 ---------- */
@@ -339,7 +340,7 @@ const aboutOpen = ref(false)
   cursor: pointer;
 }
 
-/* 内容区左右内边距 */
+/* 内容区左右内边距（统一用 margin，块级元素自动撑满剩余宽度） */
 .acct-card,
 .acct-summary,
 .acct-month,
@@ -348,6 +349,7 @@ const aboutOpen = ref(false)
 .acct-version {
   margin-left: var(--space-md);
   margin-right: var(--space-md);
+  box-sizing: border-box;
 }
 
 /* ---------- 账号卡 ---------- */
@@ -355,7 +357,7 @@ const aboutOpen = ref(false)
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  padding: var(--space-lg);
+  padding: var(--space-md);
   border-radius: var(--radius-xl);
   background:
     radial-gradient(120% 100% at 0% 0%, rgba(56, 189, 248, 0.18), transparent 60%),
@@ -367,8 +369,8 @@ const aboutOpen = ref(false)
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 46px;
+  height: 46px;
   flex: none;
   border-radius: var(--radius-full);
   background: rgba(255, 255, 255, 0.16);
@@ -417,7 +419,7 @@ const aboutOpen = ref(false)
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: var(--space-md) var(--space-sm);
+  padding: var(--space-sm) var(--space-sm);
   border-right: 1px solid var(--color-border);
 }
 
@@ -459,7 +461,7 @@ const aboutOpen = ref(false)
   align-items: center;
   gap: var(--space-sm);
   width: 100%;
-  min-height: 52px;
+  min-height: 48px;
   padding: var(--space-sm) var(--space-md);
   border: none;
   border-bottom: 1px solid var(--color-border);
@@ -511,8 +513,9 @@ const aboutOpen = ref(false)
   align-items: center;
   justify-content: center;
   gap: var(--space-xs);
-  width: 100%;
-  min-height: 48px;
+  /* 不用 width:100%：外层已有左右 margin，100% 会溢出容器 */
+  width: auto;
+  min-height: 46px;
   border: 1px solid var(--color-danger-border, rgba(239, 68, 68, 0.3));
   border-radius: var(--radius-lg);
   background: var(--color-danger-soft, rgba(239, 68, 68, 0.08));
@@ -528,6 +531,7 @@ const aboutOpen = ref(false)
 }
 
 .acct-version {
+  margin-top: calc(var(--space-xs) * -1);
   text-align: center;
   font-size: var(--text-2xs);
   color: var(--color-fg-tertiary);

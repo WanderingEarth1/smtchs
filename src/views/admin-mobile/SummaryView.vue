@@ -35,6 +35,20 @@ const toast = useToast()
 
 const monthKey = ref(currentMonthKey())
 const employeeFilter = ref('')
+const empFilterOpen = ref(false)
+
+/** 当前筛选的员工名（用于触发按钮显示） */
+const selectedEmpName = computed(() => {
+  if (!employeeFilter.value) return '全部员工'
+  const emp = engineers.value.find((e) => e.id === employeeFilter.value)
+  return emp ? emp.name : '全部员工'
+})
+
+/** 选择员工并关闭弹层 */
+function pickEmployee(id: string): void {
+  employeeFilter.value = id
+  empFilterOpen.value = false
+}
 
 const engineers = ref<Employee[]>([])
 const report = ref<MonthlyReport>({
@@ -161,13 +175,13 @@ const drillTotal = computed(() =>
         </span>
       </div>
 
-      <!-- 员工筛选 -->
+      <!-- 员工筛选：点击从底部上拉 -->
       <div class="field">
-        <label class="field__label" for="m-emp-filter">按员工筛选</label>
-        <select id="m-emp-filter" v-model="employeeFilter" class="select">
-          <option value="">全部员工</option>
-          <option v-for="emp in engineers" :key="emp.id" :value="emp.id">{{ emp.name }}</option>
-        </select>
+        <span class="field__label">按员工筛选</span>
+        <button type="button" class="filter-trigger" @click="empFilterOpen = true">
+          <span class="filter-trigger__value">{{ selectedEmpName }}</span>
+          <AppIcon name="chevron-down" :size="16" class="filter-trigger__arrow" />
+        </button>
       </div>
 
       <!-- 按员工汇总 -->
@@ -260,6 +274,32 @@ const drillTotal = computed(() =>
         </div>
       </section>
     </div>
+
+    <!-- 员工筛选弹层 -->
+    <AppSheet :open="empFilterOpen" title="按员工筛选" @close="empFilterOpen = false">
+      <div class="filter-list">
+        <button
+          type="button"
+          class="filter-option"
+          :class="{ 'is-active': employeeFilter === '' }"
+          @click="pickEmployee('')"
+        >
+          <span>全部员工</span>
+          <AppIcon v-if="employeeFilter === ''" name="check" :size="18" />
+        </button>
+        <button
+          v-for="emp in engineers"
+          :key="emp.id"
+          type="button"
+          class="filter-option"
+          :class="{ 'is-active': employeeFilter === emp.id }"
+          @click="pickEmployee(emp.id)"
+        >
+          <span>{{ emp.name }}</span>
+          <AppIcon v-if="employeeFilter === emp.id" name="check" :size="18" />
+        </button>
+      </div>
+    </AppSheet>
 
     <!-- 下钻明细 -->
     <AppSheet
@@ -611,4 +651,5 @@ const drillTotal = computed(() =>
   padding-top: 4px;
   border-top: 1px dashed var(--color-divider);
 }
+
 </style>

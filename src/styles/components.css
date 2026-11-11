@@ -739,3 +739,79 @@
 .gap-md {
   gap: var(--space-md);
 }
+
+/* ============================================================
+   筛选触发按钮 + 底部上拉选项列表
+   用于管理端移动的「按员工筛选」等场景
+   ============================================================ */
+
+.filter-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.filter-trigger:active {
+  border-color: var(--color-primary);
+}
+
+.filter-trigger__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-trigger__arrow {
+  flex: none;
+  color: var(--color-fg-tertiary);
+}
+
+.filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-fg);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.filter-option:active {
+  background: var(--color-surface-hover);
+}
+
+.filter-option.is-active {
+  background: var(--color-primary-soft, rgba(0, 82, 255, 0.08));
+  color: var(--color-primary);
+  font-weight: var(--weight-semibold);
+}

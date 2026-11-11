@@ -42,6 +42,20 @@ const toast = useToast()
 const monthKey = ref(currentMonthKey())
 const statusFilter = ref<RecordStatus | 'ALL'>('PENDING')
 const employeeFilter = ref('')
+const empFilterOpen = ref(false)
+
+/** 当前筛选的员工名 */
+const selectedEmpName = computed(() => {
+  if (!employeeFilter.value) return '全部员工'
+  const emp = engineers.value.find((e) => e.id === employeeFilter.value)
+  return emp ? emp.name : '全部员工'
+})
+
+/** 选择员工并关闭弹层 */
+function pickEmployee(id: string): void {
+  employeeFilter.value = id
+  empFilterOpen.value = false
+}
 
 const selectedIds = ref<Set<string>>(new Set())
 
@@ -245,10 +259,10 @@ async function doBulkApprove(): Promise<void> {
         </button>
       </nav>
 
-      <select v-model="employeeFilter" class="select" aria-label="按员工筛选">
-        <option value="">全部员工</option>
-        <option v-for="emp in engineers" :key="emp.id" :value="emp.id">{{ emp.name }}</option>
-      </select>
+      <button type="button" class="filter-trigger" @click="empFilterOpen = true">
+        <span class="filter-trigger__value">{{ selectedEmpName }}</span>
+        <AppIcon name="chevron-down" :size="16" class="filter-trigger__arrow" />
+      </button>
 
       <!-- 全选 -->
       <div v-if="selectable.length > 0" class="selectall">
@@ -525,6 +539,31 @@ async function doBulkApprove(): Promise<void> {
           确认 {{ selectedCount }} 条
         </button>
       </template>
+    </AppSheet>
+    <!-- 员工筛选弹层 -->
+    <AppSheet :open="empFilterOpen" title="按员工筛选" @close="empFilterOpen = false">
+      <div class="filter-list">
+        <button
+          type="button"
+          class="filter-option"
+          :class="{ 'is-active': employeeFilter === '' }"
+          @click="pickEmployee('')"
+        >
+          <span>全部员工</span>
+          <AppIcon v-if="employeeFilter === ''" name="check" :size="18" />
+        </button>
+        <button
+          v-for="emp in engineers"
+          :key="emp.id"
+          type="button"
+          class="filter-option"
+          :class="{ 'is-active': employeeFilter === emp.id }"
+          @click="pickEmployee(emp.id)"
+        >
+          <span>{{ emp.name }}</span>
+          <AppIcon v-if="employeeFilter === emp.id" name="check" :size="18" />
+        </button>
+      </div>
     </AppSheet>
   </div>
 </template>

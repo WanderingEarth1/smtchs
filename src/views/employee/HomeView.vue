@@ -372,9 +372,9 @@ function goDetail(id: string): void {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
-  /* 预留底部标签栏 + FAB 上浮部分 */
+  /* 预留底部标签栏 + FAB 完整高度（FAB 62px + 上移 100px + 呼吸余量 24px） */
   padding: var(--space-sm) var(--space-md)
-    calc(var(--tabbar-height) + 44px + var(--safe-bottom));
+    calc(var(--tabbar-height) + 186px + var(--safe-bottom));
 }
 
 /* ---------- 提成主卡 ---------- */
@@ -755,8 +755,8 @@ function goDetail(id: string): void {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  /* 骑跨在底部标签栏上沿 */
-  bottom: calc(var(--tabbar-height) + var(--safe-bottom) - 26px);
+  /* 上移 100px：避免遮挡「我的记录」列表底部内容 */
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 100px);
   z-index: 45;
   display: flex;
   flex-direction: column;
