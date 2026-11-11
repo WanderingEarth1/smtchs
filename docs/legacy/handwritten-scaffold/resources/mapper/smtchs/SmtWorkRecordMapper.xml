@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.smtchs.mapper.SmtWorkRecordMapper">
+
+    <!-- ===================================================================
+         smt_work_record 全部列显式映射（含 5 个 snap_* 快照字段）
+         create_by / create_time / update_by / update_time / remark
+         来自 BaseEntity，同样显式声明，不依赖 autoMapping
+         =================================================================== -->
+    <resultMap id="SmtWorkRecordResult" type="com.ruoyi.smtchs.domain.SmtWorkRecord">
+        <id     property="id"                     column="id"/>
+        <result property="serialNo"               column="serial_no"/>
+        <result property="employeeId"             column="employee_id"/>
+        <result property="workTypeId"             column="work_type_id"/>
+        <result property="serviceDate"            column="service_date"/>
+        <result property="startTime"              column="start_time"/>
+        <result property="endTime"                column="end_time"/>
+        <result property="location"               column="location"/>
+        <result property="latitude"               column="latitude"/>
+        <result property="longitude"              column="longitude"/>
+        <result property="geoCaptured"            column="geo_captured"/>
+        <result property="content"                column="content"/>
+        <result property="remark"                 column="remark"/>
+        <result property="status"                 column="status"/>
+        <result property="isBackfill"             column="is_backfill"/>
+        <result property="rejectReason"           column="reject_reason"/>
+        <result property="submittedAt"            column="submitted_at"/>
+        <result property="confirmedAt"            column="confirmed_at"/>
+        <result property="rejectedAt"             column="rejected_at"/>
+        <result property="snapBillingMode"        column="snap_billing_mode"/>
+        <result property="snapUnitPrice"          column="snap_unit_price"/>
+        <result property="snapOvertimeStart"      column="snap_overtime_start"/>
+        <result property="snapOvertimeMultiplier" column="snap_overtime_multiplier"/>
+        <result property="snapRoundingRule"       column="snap_rounding_rule"/>
+        <result property="createBy"               column="create_by"/>
+        <result property="createTime"             column="create_time"/>
+        <result property="updateBy"               column="update_by"/>
+        <result property="updateTime"             column="update_time"/>
+        <result property="delFlag"                column="del_flag"/>
+        <!-- 非数据库列：关联查询结果 -->
+        <result property="employeeName"           column="employee_name"/>
+        <result property="workTypeName"           column="work_type_name"/>
+    </resultMap>
+
+    <!-- 详情映射：在基础映射上追加照片集合（仅 selectRecordById 使用，避免列表 N+1） -->
+    <resultMap id="SmtWorkRecordDetailResult" type="com.ruoyi.smtchs.domain.SmtWorkRecord"
+               extends="SmtWorkRecordResult">
+        <collection property="photos"
+                    ofType="com.ruoyi.smtchs.domain.SmtRecordPhoto"
+                    column="id"
+                    select="selectPhotosByRecordId"/>
+    </resultMap>
+
+    <!-- 照片结果映射（供 collection 二次查询使用） -->
+    <resultMap id="SmtRecordPhotoResult" type="com.ruoyi.smtchs.domain.SmtRecordPhoto">
+        <id     property="id"         column="id"/>
+        <result property="recordId"   column="record_id"/>
+        <result property="url"        column="url"/>
+        <result property="sort"       column="sort"/>
+        <result property="size"       column="size"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <!-- 主表列清单（含关联展示列），供各查询复用 -->
+    <sql id="recordColumns">
+        r.id, r.serial_no, r.employee_id, r.work_type_id, r.service_date,
+        r.start_time, r.end_time, r.location, r.latitude, r.longitude,
+        r.geo_captured, r.content, r.remark, r.status, r.is_backfill,
+        r.reject_reason, r.submitted_at, r.confirmed_at, r.rejected_at,
+        r.snap_billing_mode, r.snap_unit_price, r.snap_overtime_start,
+        r.snap_overtime_multiplier, r.snap_rounding_rule,
+        r.create_by, r.create_time, r.update_by, r.update_time, r.del_flag,
+        e.name AS employee_name,
+        w.name AS work_type_name
+    </sql>
+
+    <!-- 列表查询：带员工姓名与工作类型名称 -->
+    <select id="selectRecordList" parameterType="com.ruoyi.smtchs.domain.SmtWorkRecord" resultMap="SmtWorkRecordResult">
+        SELECT <include refid="recordColumns"/>
+        FROM smt_work_record r
+        LEFT JOIN smt_employee e ON e.id = r.employee_id AND e.del_flag = '0'
+        LEFT JOIN smt_work_type w ON w.id = r.work_type_id AND w.del_flag = '0'
+        <where>
+            r.del_flag = '0'
+            <if test="serialNo != null and serialNo != ''">
+                AND r.serial_no LIKE CONCAT('%', #{serialNo}, '%')
+            </if>
+            <if test="employeeId != null">
+                AND r.employee_id = #{employeeId}
+            </if>
+            <if test="workTypeId != null">
+                AND r.work_type_id = #{workTypeId}
+            </if>
+            <if test="status != null and status != ''">
+                AND r.status = #{status}
+            </if>
+            <if test="location != null and location != ''">
+                AND r.location LIKE CONCAT('%', #{location}, '%')
+            </if>
+            <if test="isBackfill != null">
+                AND r.is_backfill = #{isBackfill}
+            </if>
+            <if test="serviceDate != null">
+                AND r.service_date = #{serviceDate}
+            </if>
+            <if test="params != null and params.beginServiceDate != null and params.beginServiceDate != ''">
+                AND r.service_date &gt;= #{params.beginServiceDate}
+            </if>
+            <if test="params != null and params.endServiceDate != null and params.endServiceDate != ''">
+                AND r.service_date &lt;= #{params.endServiceDate}
+            </if>
+            <!-- 月份筛选：yyyy-MM -->
+            <if test="month != null and month != ''">
+                AND DATE_FORMAT(r.service_date, '%Y-%m') = #{month}
+            </if>
+            <!-- 关键词：流水号 / 地点 / 工作内容 -->
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    r.serial_no LIKE CONCAT('%', #{keyword}, '%')
+                    OR r.location LIKE CONCAT('%', #{keyword}, '%')
+                    OR r.content LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+        ORDER BY r.service_date DESC, r.start_time DESC, r.id DESC
+    </select>
+
+    <!-- 详情：主表 + 照片（collection 二次查询） -->
+    <select id="selectRecordById" parameterType="java.lang.Long" resultMap="SmtWorkRecordDetailResult">
+        SELECT <include refid="recordColumns"/>
+        FROM smt_work_record r
+        LEFT JOIN smt_employee e ON e.id = r.employee_id AND e.del_flag = '0'
+        LEFT JOIN smt_work_type w ON w.id = r.work_type_id AND w.del_flag = '0'
+        WHERE r.id = #{id}
+          AND r.del_flag = '0'
+    </select>
+
+    <!-- 照片二次查询：smt_record_photo 无 del_flag 列，按 record_id 直取 -->
+    <select id="selectPhotosByRecordId" resultMap="SmtRecordPhotoResult">
+        SELECT id, record_id, url, `sort`, `size`, create_time
+        FROM smt_record_photo
+        WHERE record_id = #{recordId}
+        ORDER BY `sort` ASC, id ASC
+    </select>
+
+    <!-- 按月查询已确认记录（报表用） -->
+    <select id="selectApprovedByMonth" resultMap="SmtWorkRecordResult">
+        SELECT <include refid="recordColumns"/>
+        FROM smt_work_record r
+        LEFT JOIN smt_employee e ON e.id = r.employee_id
+        LEFT JOIN smt_work_type w ON w.id = r.work_type_id
+        WHERE r.del_flag = '0'
+          AND r.status = 'APPROVED'
+          AND DATE_FORMAT(r.service_date, '%Y-%m') = #{month}
+        <if test="employeeId != null">
+            AND r.employee_id = #{employeeId}
+        </if>
+        <if test="workTypeId != null">
+            AND r.work_type_id = #{workTypeId}
+        </if>
+        ORDER BY r.service_date DESC, r.start_time DESC
+    </select>
+
+    <!-- 我的记录 -->
+    <select id="selectMyRecords" resultMap="SmtWorkRecordResult">
+        SELECT <include refid="recordColumns"/>
+        FROM smt_work_record r
+        LEFT JOIN smt_employee e ON e.id = r.employee_id AND e.del_flag = '0'
+        LEFT JOIN smt_work_type w ON w.id = r.work_type_id AND w.del_flag = '0'
+        WHERE r.del_flag = '0'
+          AND r.employee_id = #{employeeId}
+        <if test="month != null and month != ''">
+            AND DATE_FORMAT(r.service_date, '%Y-%m') = #{month}
+        </if>
+        <if test="status != null and status != ''">
+            AND r.status = #{status}
+        </if>
+        ORDER BY r.service_date DESC, r.start_time DESC, r.id DESC
+    </select>
+
+    <!-- 按状态统计 -->
+    <select id="countByStatus" resultType="java.lang.Integer">
+        SELECT COUNT(1)
+        FROM smt_work_record
+        WHERE del_flag = '0'
+          AND status = #{status}
+    </select>
+
+    <!-- 流水号：取当月最大序号。
+         注意：此处刻意不加 del_flag 过滤——uk_serial_no 唯一键覆盖已删除行，
+         若只取未删除记录的最大值，可能与已删除记录撞号。 -->
+    <select id="selectMaxSerialNo" resultType="java.lang.String">
+        SELECT MAX(serial_no) FROM smt_work_record
+        WHERE serial_no LIKE CONCAT(#{prefix}, '%')
+    </select>
+
+    <insert id="insertRecord" parameterType="com.ruoyi.smtchs.domain.SmtWorkRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO smt_work_record (
+            serial_no, employee_id, work_type_id, service_date,
+            start_time, end_time, location, latitude, longitude,
+            geo_captured, content, remark, status, is_backfill,
+            reject_reason, submitted_at, confirmed_at, rejected_at,
+            snap_billing_mode, snap_unit_price, snap_overtime_start,
+            snap_overtime_multiplier, snap_rounding_rule,
+            create_by, create_time, del_flag
+        ) VALUES (
+            #{serialNo}, #{employeeId}, #{workTypeId}, #{serviceDate},
+            #{startTime}, #{endTime}, #{location}, #{latitude}, #{longitude},
+            #{geoCaptured}, #{content}, #{remark}, #{status}, #{isBackfill},
+            #{rejectReason}, IFNULL(#{submittedAt}, NOW()), #{confirmedAt}, #{rejectedAt},
+            #{snapBillingMode}, #{snapUnitPrice}, #{snapOvertimeStart},
+            #{snapOvertimeMultiplier}, #{snapRoundingRule},
+            #{createBy}, NOW(), '0'
+        )
+    </insert>
+
+    <update id="updateRecord" parameterType="com.ruoyi.smtchs.domain.SmtWorkRecord">
+        UPDATE smt_work_record
+        <set>
+            <if test="serialNo != null and serialNo != ''">
+                serial_no = #{serialNo},
+            </if>
+            <if test="employeeId != null">
+                employee_id = #{employeeId},
+            </if>
+            <if test="workTypeId != null">
+                work_type_id = #{workTypeId},
+            </if>
+            <if test="serviceDate != null">
+                service_date = #{serviceDate},
+            </if>
+            <if test="startTime != null and startTime != ''">
+                start_time = #{startTime},
+            </if>
+            <if test="endTime != null">
+                end_time = #{endTime},
+            </if>
+            <if test="location != null and location != ''">
+                location = #{location},
+            </if>
+            <if test="latitude != null">
+                latitude = #{latitude},
+            </if>
+            <if test="longitude != null">
+                longitude = #{longitude},
+            </if>
+            <if test="geoCaptured != null">
+                geo_captured = #{geoCaptured},
+            </if>
+            <if test="content != null and content != ''">
+                content = #{content},
+            </if>
+            <if test="remark != null">
+                remark = #{remark},
+            </if>
+            <if test="status != null and status != ''">
+                status = #{status},
+            </if>
+            <if test="isBackfill != null">
+                is_backfill = #{isBackfill},
+            </if>
+            <if test="rejectReason != null">
+                reject_reason = #{rejectReason},
+            </if>
+            <if test="submittedAt != null">
+                submitted_at = #{submittedAt},
+            </if>
+            <if test="confirmedAt != null">
+                confirmed_at = #{confirmedAt},
+            </if>
+            <if test="rejectedAt != null">
+                rejected_at = #{rejectedAt},
+            </if>
+            <if test="snapBillingMode != null and snapBillingMode != ''">
+                snap_billing_mode = #{snapBillingMode},
+            </if>
+            <if test="snapUnitPrice != null">
+                snap_unit_price = #{snapUnitPrice},
+            </if>
+            <if test="snapOvertimeStart != null and snapOvertimeStart != ''">
+                snap_overtime_start = #{snapOvertimeStart},
+            </if>
+            <if test="snapOvertimeMultiplier != null">
+                snap_overtime_multiplier = #{snapOvertimeMultiplier},
+            </if>
+            <if test="snapRoundingRule != null and snapRoundingRule != ''">
+                snap_rounding_rule = #{snapRoundingRule},
+            </if>
+            <if test="updateBy != null">
+                update_by = #{updateBy},
+            </if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+          AND del_flag = '0'
+    </update>
+
+    <!-- 乐观锁：只有状态仍为 PENDING 才更新 -->
+    <update id="updateStatusIfPending">
+        UPDATE smt_work_record
+        SET status = #{status},
+            confirmed_at = #{time},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND status = 'PENDING'
+          AND del_flag = '0'
+    </update>
+
+    <!-- 乐观锁驳回：只有状态仍为 PENDING 才写入驳回原因 -->
+    <update id="rejectIfPending">
+        UPDATE smt_work_record
+        SET status        = 'REJECTED',
+            reject_reason = #{reason},
+            rejected_at   = #{time},
+            update_time   = NOW()
+        WHERE id = #{id}
+          AND status = 'PENDING'
+          AND del_flag = '0'
+    </update>
+
+    <!-- 员工修改后重新提交：固定 SET 列表，可把 end_time 显式置空 -->
+    <update id="updateRecordForResubmit" parameterType="com.ruoyi.smtchs.domain.SmtWorkRecord">
+        UPDATE smt_work_record
+        SET work_type_id             = #{workTypeId},
+            service_date             = #{serviceDate},
+            start_time               = #{startTime},
+            end_time                 = #{endTime},
+            location                 = #{location},
+            latitude                 = #{latitude},
+            longitude                = #{longitude},
+            geo_captured             = #{geoCaptured},
+            content                  = #{content},
+            remark                   = #{remark},
+            status                   = 'PENDING',
+            is_backfill              = #{isBackfill},
+            reject_reason            = NULL,
+            rejected_at              = NULL,
+            submitted_at             = #{submittedAt},
+            snap_billing_mode        = #{snapBillingMode},
+            snap_unit_price          = #{snapUnitPrice},
+            snap_overtime_start      = #{snapOvertimeStart},
+            snap_overtime_multiplier = #{snapOvertimeMultiplier},
+            snap_rounding_rule       = #{snapRoundingRule},
+            update_by                = #{updateBy},
+            update_time              = NOW()
+        WHERE id = #{id}
+          AND status &lt;&gt; 'APPROVED'
+          AND del_flag = '0'
+    </update>
+
+    <!-- 修正已确认记录：固定 SET 列表，可把 end_time 显式置空；状态与审核痕迹保持不变 -->
+    <update id="updateRecordForRevision" parameterType="com.ruoyi.smtchs.domain.SmtWorkRecord">
+        UPDATE smt_work_record
+        SET service_date = #{serviceDate},
+            start_time   = #{startTime},
+            end_time     = #{endTime},
+            location     = #{location},
+            content      = #{content},
+            update_by    = #{updateBy},
+            update_time  = NOW()
+        WHERE id = #{id}
+          AND del_flag = '0'
+    </update>
+
+    <!-- 新增记录照片 -->
+    <insert id="insertPhoto" parameterType="com.ruoyi.smtchs.domain.SmtRecordPhoto"
+            useGeneratedKeys="true" keyProperty="id">        INSERT INTO smt_record_photo (
+            record_id, url, `sort`, `size`, create_time
+        ) VALUES (
+            #{recordId}, #{url}, IFNULL(#{sort}, 0), IFNULL(#{size}, 0), NOW()
+        )
+    </insert>
+
+    <!-- 编辑记录时整体替换照片 -->
+    <delete id="deletePhotosByRecordId" parameterType="java.lang.Long">
+        DELETE FROM smt_record_photo WHERE record_id = #{recordId}
+    </delete>
+
+    <update id="deleteRecordById" parameterType="java.lang.Long">
+        UPDATE smt_work_record
+        SET del_flag    = '2',
+            update_time = NOW()
+        WHERE id = #{id}
+          AND del_flag = '0'
+    </update>
+
+</mapper>

@@ -1,7 +1,5 @@
 package com.ruoyi.web.controller.smtchs;
 
-import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.annotation.write.style.ColumnWidth;
 
 import java.math.BigDecimal;
 
@@ -16,38 +14,24 @@ import java.math.BigDecimal;
 public class EmployeeSummaryExcelVO
 {
     /** 员工姓名 */
-    @ExcelProperty("员工")
-    @ColumnWidth(12)
     private String employeeName;
 
     /** 按次次数合计 */
-    @ExcelProperty("次数合计")
-    @ColumnWidth(12)
     private Integer countTotal;
 
     /** 正常时长合计（小时） */
-    @ExcelProperty("正常时长合计h")
-    @ColumnWidth(16)
     private BigDecimal normalHoursTotal;
 
     /** 加班时长合计（小时） */
-    @ExcelProperty("加班时长合计h")
-    @ColumnWidth(16)
     private BigDecimal overtimeHoursTotal;
 
     /** 按次金额合计（元） */
-    @ExcelProperty("按次金额")
-    @ColumnWidth(14)
     private BigDecimal byCountAmount;
 
     /** 按时金额合计（元） */
-    @ExcelProperty("按时金额")
-    @ColumnWidth(14)
     private BigDecimal byHourAmount;
 
     /** 提成合计（元） */
-    @ExcelProperty("提成合计")
-    @ColumnWidth(14)
     private BigDecimal totalAmount;
 
     public String getEmployeeName()

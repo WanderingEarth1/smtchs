@@ -14,5 +14,12 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5273,
     strictPort: false,
+    // 开发时把 /smtchs 转发到后端，避免跨域
+    proxy: {
+      '/smtchs': {
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+    },
   },
 })

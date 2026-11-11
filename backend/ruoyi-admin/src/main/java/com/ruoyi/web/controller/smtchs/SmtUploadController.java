@@ -5,6 +5,7 @@ import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.exception.file.InvalidExtensionException;
 import com.ruoyi.common.utils.file.FileUploadUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,7 +49,8 @@ public class SmtUploadController extends BaseController
      */
     @Log(title = "照片上传", businessType = BusinessType.INSERT)
     @PostMapping("/photo")
-    public AjaxResult uploadPhoto(@RequestParam("file") MultipartFile file) throws IOException
+    public AjaxResult uploadPhoto(@RequestParam("file") MultipartFile file)
+            throws IOException, InvalidExtensionException
     {
         if (file == null || file.isEmpty())
         {

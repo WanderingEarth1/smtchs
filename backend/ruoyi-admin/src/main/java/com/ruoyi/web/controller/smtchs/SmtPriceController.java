@@ -5,6 +5,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.smtchs.domain.SmtPriceRule;
+import com.ruoyi.smtchs.service.ISmtEmployeeService;
 import com.ruoyi.smtchs.service.ISmtPriceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +32,9 @@ public class SmtPriceController extends BaseController
     @Autowired
     private ISmtPriceService priceService;
 
+    @Autowired
+    private ISmtEmployeeService employeeService;
+
     /**
      * 查询完整单价矩阵（员工 × 工作类型，含姓名与类型名称）。
      *
@@ -51,6 +55,27 @@ public class SmtPriceController extends BaseController
      * @param rule 单价规则，需含 {@code employeeId} / {@code workTypeId} / {@code price}
      * @return 保存后的单价规则
      */
+    /**
+     * 查询本人单价矩阵。
+     *
+     * <p>员工端提交记录时需要显示金额预估，但员工没有「查看全部单价」的管理权限，
+     * 因此单独提供只返回本人单价的接口，避免把他人单价暴露给普通员工。</p>
+     *
+     * @return 当前登录员工的单价列表
+     */
+    @GetMapping("/my")
+    public AjaxResult myMatrix()
+    {
+        Long employeeId = employeeService.getCurrentEmployeeId();
+        if (employeeId == null)
+        {
+            return AjaxResult.error("当前账号未关联员工档案");
+        }
+        SmtPriceRule query = new SmtPriceRule();
+        query.setEmployeeId(employeeId);
+        return AjaxResult.success("操作成功", priceService.selectPriceRuleList(query));
+    }
+
     @PreAuthorize("@ss.hasPermi('smtchs:price:edit')")
     @Log(title = "单价矩阵", businessType = BusinessType.UPDATE)
     @PutMapping

@@ -84,6 +84,12 @@ export async function request<T>(url: string, options: RequestInit = {}): Promis
 
   const json = (await response.json()) as ApiResponse
 
+  // 若依约定：HTTP 200 承载业务错误码，401/403 需在 body 里判断
+  if (json.code === 401) {
+    handleUnauthorized()
+    throw new ApiError(json.msg || '登录已过期，请重新登录', 401)
+  }
+
   if (json.code !== 200) {
     throw new ApiError(json.msg || '请求失败', json.code)
   }

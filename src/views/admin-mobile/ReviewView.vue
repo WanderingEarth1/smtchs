@@ -144,9 +144,9 @@ const detailBilling = computed(() =>
 )
 
 /* ---------------- 确认 ---------------- */
-function doApprove(record: WorkRecord): void {
+async function doApprove(record: WorkRecord): Promise<void> {
   try {
-    approveRecord(record.id)
+    await approveRecord(record.id)
     bumpDataVersion()
     toast.success(`已确认 ${getEmployeeName(record.employeeId)} 的记录`)
     detailId.value = null
@@ -168,7 +168,7 @@ function openReject(id: string): void {
   rejectOpen.value = true
 }
 
-function submitReject(): void {
+async function submitReject(): Promise<void> {
   if (!rejectTargetId.value) return
   rejectError.value = ''
   if (!rejectReason.value.trim()) {
@@ -176,7 +176,7 @@ function submitReject(): void {
     return
   }
   try {
-    rejectRecord(rejectTargetId.value, rejectReason.value)
+    await rejectRecord(rejectTargetId.value, rejectReason.value)
     bumpDataVersion()
     toast.success('已驳回，员工可修改后重新提交')
     rejectOpen.value = false

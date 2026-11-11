@@ -1,7 +1,5 @@
 package com.ruoyi.web.controller.smtchs;
 
-import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.annotation.write.style.ColumnWidth;
 
 import java.math.BigDecimal;
 
@@ -17,88 +15,54 @@ import java.math.BigDecimal;
 public class RecordDetailExcelVO
 {
     /** 流水号 */
-    @ExcelProperty("流水号")
-    @ColumnWidth(18)
     private String serialNo;
 
     /** 员工姓名 */
-    @ExcelProperty("员工")
-    @ColumnWidth(10)
     private String employeeName;
 
     /** 服务日期 yyyy-MM-dd */
-    @ExcelProperty("日期")
-    @ColumnWidth(12)
     private String serviceDate;
 
     /** 工作类型名称 */
-    @ExcelProperty("工作类型")
-    @ColumnWidth(12)
     private String workTypeName;
 
     /** 计费模式中文（按小时 / 按次） */
-    @ExcelProperty("计费模式")
-    @ColumnWidth(10)
     private String billingMode;
 
     /** 开始时间 HH:mm */
-    @ExcelProperty("开始时间")
-    @ColumnWidth(10)
     private String startTime;
 
     /** 结束时间 HH:mm，按次为「—」 */
-    @ExcelProperty("结束时间")
-    @ColumnWidth(10)
     private String endTime;
 
     /** 正常时长（小时） */
-    @ExcelProperty("正常时长h")
-    @ColumnWidth(12)
     private BigDecimal normalHours;
 
     /** 加班时长（小时） */
-    @ExcelProperty("加班时长h")
-    @ColumnWidth(12)
     private BigDecimal overtimeHours;
 
     /** 服务地点 */
-    @ExcelProperty("地点")
-    @ColumnWidth(24)
     private String location;
 
     /** 定位信息（纬度,经度）或「未获取定位」 */
-    @ExcelProperty("定位")
-    @ColumnWidth(22)
     private String geoText;
 
     /** 工作内容摘要（截断至 60 字） */
-    @ExcelProperty("工作内容摘要")
-    @ColumnWidth(40)
     private String contentSummary;
 
     /** 照片链接说明（凭证 N 张 / 无） */
-    @ExcelProperty("照片链接")
-    @ColumnWidth(24)
     private String photoLinks;
 
     /** 状态中文（待确认 / 已确认 / 已驳回） */
-    @ExcelProperty("状态")
-    @ColumnWidth(10)
     private String statusText;
 
     /** 是否补录（是 / 否） */
-    @ExcelProperty("是否补录")
-    @ColumnWidth(10)
     private String backfillText;
 
     /** 单价（元/次 或 元/小时） */
-    @ExcelProperty("单价")
-    @ColumnWidth(10)
     private BigDecimal unitPrice;
 
     /** 提成金额（元） */
-    @ExcelProperty("金额")
-    @ColumnWidth(12)
     private BigDecimal amount;
 
     public String getSerialNo()

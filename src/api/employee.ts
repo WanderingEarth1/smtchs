@@ -11,10 +11,11 @@ export interface EmployeeDto extends Omit<Employee, 'status' | 'role'> {
   role?: string
 }
 
-/** 状态映射：后端 '0'/'1' ↔ 前端 'ACTIVE'/'DISABLED' */
+/** 状态映射：后端 '0'/'1' ↔ 前端 'ACTIVE'/'DISABLED'，id 统一转 string */
 export function normalizeEmployee(dto: EmployeeDto): Employee {
   return {
     ...dto,
+    id: String(dto.id),
     status: dto.status === '0' ? 'ACTIVE' : 'DISABLED',
     role: (dto.role as Employee['role']) || 'EMPLOYEE',
   }

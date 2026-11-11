@@ -72,6 +72,26 @@ export function roundMoney(value: number): number {
 }
 
 /**
+ * 按分钟数计算金额（整数分运算，避免浮点误差）
+ *
+ * 不能写成 `(minutes / 60) * unitPrice`：JS 的 `minutes / 60` 无法精确表示，
+ * 例如 5 分钟 × 123.3 元/时精确值是 10.275（应进位到 10.28），
+ * 但 `5/60 = 0.08333333333333333` 乘出来是 10.2749999… 被舍成 10.27。
+ *
+ * 这里先把单价转成整数分，全程整数乘法，除法结果最多是 x.5，
+ * `Math.round` 可精确处理，结果与后端 BigDecimal「先乘后除」完全一致。
+ */
+export function amountFromMinutes(minutes: number, unitPrice: number, multiplier = 1): number {
+  if (minutes <= 0 || unitPrice <= 0) return 0
+  const priceCents = Math.round(unitPrice * 100)
+  const multiplierCents = Math.round(multiplier * 100)
+  // 分母 60 × 100（倍率的分位），分子为整数分
+  const numerator = minutes * priceCents * multiplierCents
+  const denominator = 60 * 100
+  return Math.round(numerator / denominator) / 100
+}
+
+/**
  * 按取整规则向上补足时长（单位：分钟）
  * - EXACT：精确到分钟，不取整
  * - HALF_HOUR_UP：半小时向上取整
@@ -169,8 +189,8 @@ export function calculateBilling(input: BillingInput): BillingResult {
   // 3) 计费（直接用分钟数换算，避免小时数四舍五入引入的分位误差）
   const normalHours = toHours(normalMin)
   const overtimeHours = toHours(overtimeMin)
-  const normalAmount = roundMoney((normalMin / 60) * unitPrice)
-  const overtimeAmount = roundMoney((overtimeMin / 60) * unitPrice * overtimeMultiplier)
+  const normalAmount = amountFromMinutes(normalMin, unitPrice)
+  const overtimeAmount = amountFromMinutes(overtimeMin, unitPrice, overtimeMultiplier)
   const total = roundMoney(normalAmount + overtimeAmount)
 
   const rawNormalHours = toHours(rawNormalMin)

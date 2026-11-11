@@ -1,7 +1,6 @@
 package com.ruoyi.smtchs.service.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.smtchs.domain.SmtRecordRevision;
@@ -56,7 +55,6 @@ public class SmtReviewServiceImpl implements ISmtReviewService
     private static final int CONTENT_MAX_LENGTH = 200;
 
     /** 修正快照序列化器：仅序列化 5 个可编辑字段，无需 JavaTimeModule */
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Autowired
     private SmtWorkRecordMapper recordMapper;
@@ -329,9 +327,9 @@ public class SmtReviewServiceImpl implements ISmtReviewService
 
         try
         {
-            return OBJECT_MAPPER.writeValueAsString(snapshot);
+            return JSON.toJSONString(snapshot);
         }
-        catch (JsonProcessingException e)
+        catch (RuntimeException e)
         {
             // 仅序列化字符串映射，正常不会失败
             throw new ServiceException("修正快照序列化失败：" + e.getMessage());

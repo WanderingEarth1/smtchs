@@ -6,6 +6,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.smtchs.dto.RevisionDTO;
+import com.ruoyi.smtchs.domain.SmtWorkRecord;
 import com.ruoyi.smtchs.service.ISmtEmployeeService;
 import com.ruoyi.smtchs.service.ISmtRecordService;
 import com.ruoyi.smtchs.service.ISmtReviewService;

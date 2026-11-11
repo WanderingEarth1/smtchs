@@ -10,7 +10,7 @@ import com.ruoyi.common.core.domain.model.LoginUser;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.ip.IpUtils;
 import com.ruoyi.framework.web.service.TokenService;
-import com.ruoyi.system.service.ISysPermissionService;
+import com.ruoyi.framework.web.service.SysPermissionService;
 import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.smtchs.domain.SmtEmployee;
 import com.ruoyi.smtchs.dto.ChangePasswordDTO;
@@ -56,7 +56,7 @@ public class SmtAuthController extends BaseController
     private ISysUserService sysUserService;
 
     @Autowired
-    private ISysPermissionService permissionService;
+    private SysPermissionService permissionService;
 
     @Autowired
     private TokenService tokenService;

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.Collections;
 
 /**
  * 员工管理控制器（CFG-01 / LOG-04 / LOG-06）。

@@ -92,12 +92,21 @@ export async function refreshWorkTypeCache(): Promise<void> {
   }
 }
 
-/** 刷新单价缓存 */
+/**
+ * 刷新单价缓存
+ *
+ * 管理员走 /price/matrix（全部）；员工走 /price/my（仅本人）。
+ * 两者都失败时保持空缓存，页面会隐藏金额预估但不影响提交。
+ */
 export async function refreshPriceCache(): Promise<void> {
   try {
     priceCache = await priceApi.getPriceMatrix()
-  } catch (err) {
-    wrapError(err)
+  } catch {
+    try {
+      priceCache = await priceApi.getMyPriceMatrix()
+    } catch {
+      priceCache = []
+    }
   }
 }
 

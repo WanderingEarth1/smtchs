@@ -9,14 +9,15 @@
 
 | 组件 | 版本 | 说明 |
 |---|---|---|
-| JDK | **1.8** | 若依 3.8.7 要求 Java 8，不是 17 |
+| JDK | **17** | 若依 3.9.2 要求 Java 17 |
 | Maven | 3.6+ | 构建后端 |
 | MySQL | 8.0+ | 字符集 `utf8mb4` |
 | Redis | 5.0+ | 若依用于缓存与 token |
 | Node.js | 18+ | 构建前端 |
 | Nginx | 1.18+ | 生产部署（可选） |
 
-> **重要**：若依 RuoYi-Vue3 v3.8.7 的后端是 **Spring Boot 2.5.15 + Java 1.8**，使用 `javax.servlet` 而非 `jakarta.servlet`。若强行升级到 Spring Boot 3，需同步改造若依框架本身。
+> **版本**：本项目基于 **RuoYi-Vue v3.9.2（Spring Boot 4.1.2 + Java 17）**，
+> 使用 `jakarta.servlet` 而非 `javax.servlet`。
 
 ---
 
@@ -94,35 +95,26 @@ SELECT COUNT(*) FROM sys_menu WHERE perms LIKE 'smtchs:%';  -- 应为 24（7 菜
 
 ## 四、后端部署
 
-### 4.1 合并若依框架
+### 4.1 后端结构
 
-本仓库的 `backend/` 只包含业务模块与启动模块。需要从若依官方获取以下三个模块放入 `backend/`：
+`backend/` 就是**完整的若依 v3.9.2 源码**，已内置：
 
 ```
 backend/
-├── ruoyi-common/       ← 从若依官方拷贝
-├── ruoyi-framework/    ← 从若依官方拷贝
-├── ruoyi-system/       ← 从若依官方拷贝
-├── ruoyi-smtchs/       ← 本仓库已有
-└── ruoyi-admin/        ← 本仓库已有
+├── pom.xml              ← 若依父 POM（已在 <modules> 注册 ruoyi-smtchs）
+├── ruoyi-common/        ← 若依框架（原样保留）
+├── ruoyi-framework/     ← 若依框架（原样保留）
+├── ruoyi-system/        ← 若依框架（原样保留）
+├── ruoyi-quartz/        ← 若依框架（原样保留）
+├── ruoyi-generator/     ← 若依框架（原样保留）
+├── ruoyi-smtchs/        ← 业务模块（本项目新增）
+├── ruoyi-admin/         ← 启动模块
+│   ├── src/main/java/com/ruoyi/web/controller/smtchs/  ← 业务控制器（新增）
+│   └── src/main/resources/mapper/smtchs/              ← 业务 Mapper（新增）
+└── sql/                 ← 数据库脚本
 ```
 
-**注意**：本仓库的 `backend/ruoyi-admin/src/main/resources/` 已包含业务所需的
-`application.yml` / `application-druid.yml` / `logback.xml` / `mybatis/mybatis-config.xml`。
-从若依官方拷贝 `ruoyi-admin` 时，**不要覆盖这些文件**；若官方版本有额外的配置项
-（如 `application-dev.yml`、i18n 资源、静态资源），请合并而非替换。
-
-然后把 `backend/pom.xml` 的 `<modules>` 补全：
-
-```xml
-<modules>
-    <module>ruoyi-common</module>
-    <module>ruoyi-framework</module>
-    <module>ruoyi-system</module>
-    <module>ruoyi-smtchs</module>
-    <module>ruoyi-admin</module>
-</modules>
-```
+**无需手工合并框架代码**——直接 `mvn package` 即可。
 
 ### 4.2 配置数据源
 
