@@ -1,6 +1,21 @@
 import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
+import fs from 'node:fs'
 import createVitePlugins from './vite/plugins'
+
+/**
+ * 局域网 HTTPS 证书（可选）
+ *
+ * 复用上级目录 certs/ 下的自签证书；存在则启用 HTTPS，
+ * 便于局域网其他设备访问且不影响功能。
+ */
+const certDir = path.resolve(process.cwd(), '..', 'certs')
+const certFile = path.join(certDir, 'cert.pem')
+const keyFile = path.join(certDir, 'key.pem')
+const httpsConfig =
+  fs.existsSync(certFile) && fs.existsSync(keyFile)
+    ? { cert: fs.readFileSync(certFile), key: fs.readFileSync(keyFile) }
+    : undefined
 
 const baseUrl = 'http://localhost:8080' // 后端接口
 
@@ -45,6 +60,7 @@ export default defineConfig(({ mode, command }) => {
       port: 80,
       host: true,
       open: true,
+      https: httpsConfig,
       proxy: {
         // https://cn.vitejs.dev/config/#server-proxy
         '/dev-api': {

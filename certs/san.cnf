@@ -1,0 +1,21 @@
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = smtchs.local
+
+[v3_req]
+subjectAltName = @alt_names
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = smtchs.local
+IP.1 = 127.0.0.1
+IP.2 = 192.168.2.79
+IP.3 = 192.168.2.23
+IP.4 = 44.10.1.37
