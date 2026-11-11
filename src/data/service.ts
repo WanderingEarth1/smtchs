@@ -169,11 +169,6 @@ export async function listEmployees(): Promise<Employee[]> {
   }
 }
 
-export async function listActiveEmployees(): Promise<Employee[]> {
-  const all = await listEmployees()
-  return all.filter((e) => e.status === 'ACTIVE')
-}
-
 export async function listEngineers(): Promise<Employee[]> {
   const all = await listEmployees()
   return all.filter((e) => e.role === 'EMPLOYEE')
@@ -352,19 +347,6 @@ export async function setUnitPrice(
     const rule = priceCache.find((p) => p.employeeId === employeeId && p.workTypeId === workTypeId)
     if (!rule) throw new BizError('单价保存失败')
     return rule
-  } catch (err) {
-    wrapError(err)
-  }
-}
-
-export async function copyPriceRow(
-  fromEmployeeId: string,
-  toEmployeeIds: string[],
-): Promise<number> {
-  try {
-    const count = await priceApi.copyPriceRow(fromEmployeeId, toEmployeeIds)
-    await refreshPriceCache()
-    return count
   } catch (err) {
     wrapError(err)
   }
@@ -790,17 +772,6 @@ export async function countPending(): Promise<number> {
   }
 }
 
-/* ============================================================
-   导出（STA-04）
-   ============================================================ */
-
-export async function exportMonthlyReport(monthKey: string): Promise<void> {
-  try {
-    await reportApi.exportMonthlyReport(monthKey)
-  } catch (err) {
-    wrapError(err)
-  }
-}
 
 /* ============================================================
    兼容导出：保留 accumulate / emptySummary 供页面使用

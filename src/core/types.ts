@@ -25,7 +25,7 @@ export interface Employee {
   name: string
   /** 登录账号 */
   account: string
-  /** 密码（原型中以不可逆摘要形式存储，见 core/hash.ts） */
+  /** 密码（仅后端持有，前端不接收） */
   passwordHash: string
   /** 状态：启用 / 停用 */
   status: EmployeeStatus
