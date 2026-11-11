@@ -1,0 +1,72 @@
+/**
+ * 业务页面通用样式
+ *
+ * 目的：让 smtchs 业务页面在若依框架内保持一致的排版密度：
+ * - 操作列按钮有明确间距，不挤在一起
+ * - 表格行高收紧，信息密度更高
+ * - 表格撑满剩余高度，下方不留大片空白
+ */
+
+/* ---------- 操作列按钮 ---------- */
+/* el-button 默认给相邻按钮加 margin-left，这里统一改为 gap 控制 */
+.el-table .cell > .el-button.op-btn {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 用 inline-flex + gap 排布操作按钮，兼容性优于 :has() */
+.el-table .cell > .el-button.op-btn:first-child {
+  margin-left: 0 !important;
+}
+
+.el-table .cell > .el-button.op-btn + .el-button.op-btn {
+  margin-left: 12px !important;
+}
+
+/* ---------- 表格密度 ---------- */
+.app-container {
+  .el-table {
+    font-size: 13px;
+  }
+
+  .el-table th.el-table__cell {
+    background-color: var(--el-fill-color-light);
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    padding: 8px 0;
+  }
+
+  .el-table td.el-table__cell {
+    padding: 7px 0;
+  }
+
+  .el-table .cell {
+    line-height: 1.5;
+  }
+
+  /* 搜索栏与表格之间收紧 */
+  .el-form--inline {
+    margin-bottom: 4px;
+  }
+
+  /* 操作栏与表格之间收紧 */
+  .mb8 {
+    margin-bottom: 8px !important;
+  }
+
+  /* 分页贴底，与表格留出呼吸空间 */
+  .el-pagination {
+    margin-top: 12px;
+  }
+}
+
+/* ---------- 空数据态 ---------- */
+/* 表格无数据时不要把整屏撑满，避免大片空白 */
+.app-container .el-table__empty-block {
+  min-height: 180px;
+}
+
+.app-container .el-table__empty-text {
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
+}

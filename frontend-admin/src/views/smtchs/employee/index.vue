@@ -26,22 +26,22 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="list">
-      <el-table-column label="姓名" prop="name" width="120" />
-      <el-table-column label="登录账号" prop="account" width="140" />
-      <el-table-column label="状态" width="100">
+    <el-table v-loading="loading" :data="list" height="calc(100vh - 340px)">
+      <el-table-column label="姓名" prop="name" min-width="140" show-overflow-tooltip />
+      <el-table-column label="登录账号" prop="account" min-width="160" show-overflow-tooltip />
+      <el-table-column label="状态" width="110" align="center">
         <template #default="scope">
           <el-tag :type="scope.row.status === '0' ? 'success' : 'info'">
             {{ scope.row.status === '0' ? '启用' : '停用' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="创建时间" prop="createTime" width="180" />
-      <el-table-column label="操作" width="280" fixed="right">
+      <el-table-column label="创建时间" prop="createTime" min-width="180" />
+      <el-table-column label="操作" width="260" fixed="right" align="center">
         <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['smtchs:employee:edit']">修改</el-button>
-          <el-button link type="primary" icon="Key" @click="handleResetPwd(scope.row)" v-hasPermi="['smtchs:employee:resetPwd']">重置密码</el-button>
-          <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['smtchs:employee:remove']">删除</el-button>
+          <el-button link type="primary" icon="Edit" class="op-btn" @click="handleUpdate(scope.row)" v-hasPermi="['smtchs:employee:edit']">修改</el-button>
+          <el-button link type="primary" icon="Key" class="op-btn" @click="handleResetPwd(scope.row)" v-hasPermi="['smtchs:employee:resetPwd']">重置密码</el-button>
+          <el-button link type="danger" icon="Delete" class="op-btn" @click="handleDelete(scope.row)" v-hasPermi="['smtchs:employee:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

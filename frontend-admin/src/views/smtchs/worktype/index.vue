@@ -17,27 +17,27 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="list">
-      <el-table-column label="类型名称" prop="name" width="160" />
-      <el-table-column label="计费模式" width="120">
+    <el-table v-loading="loading" :data="list" height="calc(100vh - 340px)">
+      <el-table-column label="类型名称" prop="name" min-width="200" show-overflow-tooltip />
+      <el-table-column label="计费模式" width="140" align="center">
         <template #default="scope">
           <el-tag :type="scope.row.billingMode === 'BY_HOUR' ? 'warning' : 'success'">
             {{ scope.row.billingMode === 'BY_HOUR' ? '按小时' : '按次' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="100">
+      <el-table-column label="状态" width="110" align="center">
         <template #default="scope">
           <el-tag :type="scope.row.enabled ? 'success' : 'info'">
             {{ scope.row.enabled ? '启用' : '停用' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="排序" prop="sort" width="80" />
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="排序" prop="sort" width="90" align="center" />
+      <el-table-column label="操作" width="180" fixed="right" align="center">
         <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['smtchs:worktype:edit']">修改</el-button>
-          <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['smtchs:worktype:remove']">删除</el-button>
+          <el-button link type="primary" icon="Edit" class="op-btn" @click="handleUpdate(scope.row)" v-hasPermi="['smtchs:worktype:edit']">修改</el-button>
+          <el-button link type="danger" icon="Delete" class="op-btn" @click="handleDelete(scope.row)" v-hasPermi="['smtchs:worktype:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

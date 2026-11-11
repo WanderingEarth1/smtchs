@@ -32,36 +32,36 @@
 
     <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" style="margin-bottom: 12px"></right-toolbar>
 
-    <el-table v-loading="loading" :data="list" @row-click="handleView">
-      <el-table-column label="流水号" prop="serialNo" width="150" />
-      <el-table-column label="员工" prop="employeeName" width="90" />
-      <el-table-column label="日期" prop="serviceDate" width="110" />
-      <el-table-column label="工作类型" prop="workTypeName" width="110" />
-      <el-table-column label="计费模式" width="100">
+    <el-table v-loading="loading" :data="list" height="calc(100vh - 400px)" @row-click="handleView">
+      <el-table-column label="流水号" prop="serialNo" min-width="160" show-overflow-tooltip />
+      <el-table-column label="员工" prop="employeeName" min-width="100" show-overflow-tooltip />
+      <el-table-column label="日期" prop="serviceDate" min-width="120" />
+      <el-table-column label="工作类型" prop="workTypeName" min-width="120" show-overflow-tooltip />
+      <el-table-column label="计费模式" width="110" align="center">
         <template #default="scope">
           <el-tag :type="scope.row.snapBillingMode === 'BY_HOUR' ? 'warning' : 'success'" size="small">
             {{ scope.row.snapBillingMode === 'BY_HOUR' ? '按小时' : '按次' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="时间" width="140">
+      <el-table-column label="时间" min-width="150">
         <template #default="scope">
           {{ scope.row.startTime }}<span v-if="scope.row.endTime">~{{ scope.row.endTime }}</span>
         </template>
       </el-table-column>
       <el-table-column label="地点" prop="location" show-overflow-tooltip min-width="160" />
-      <el-table-column label="状态" width="100">
+      <el-table-column label="状态" width="110" align="center">
         <template #default="scope">
           <el-tag :type="statusType(scope.row.status)" size="small">{{ statusText(scope.row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="补录" width="70" align="center">
+      <el-table-column label="补录" width="80" align="center">
         <template #default="scope">
           <el-tag v-if="scope.row.isBackfill" type="info" size="small">补录</el-tag>
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="100" fixed="right" align="center">
         <template #default="scope">
           <el-button link type="primary" @click.stop="handleView(scope.row)">详情</el-button>
         </template>

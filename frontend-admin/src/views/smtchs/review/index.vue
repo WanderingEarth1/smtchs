@@ -30,37 +30,37 @@
       </el-col>
     </el-row>
 
-    <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="list" height="calc(100vh - 420px)" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="50" :selectable="row => row.status === 'PENDING'" />
-      <el-table-column label="员工" prop="employeeName" width="90" />
-      <el-table-column label="工作类型" prop="workTypeName" width="110" />
-      <el-table-column label="日期" prop="serviceDate" width="110" />
-      <el-table-column label="时间" width="140">
+      <el-table-column label="员工" prop="employeeName" min-width="100" show-overflow-tooltip />
+      <el-table-column label="工作类型" prop="workTypeName" min-width="120" show-overflow-tooltip />
+      <el-table-column label="日期" prop="serviceDate" min-width="120" />
+      <el-table-column label="时间" min-width="150">
         <template #default="scope">
           {{ scope.row.startTime }}<span v-if="scope.row.endTime">~{{ scope.row.endTime }}</span>
         </template>
       </el-table-column>
       <el-table-column label="地点" prop="location" show-overflow-tooltip min-width="150" />
       <el-table-column label="工作内容" prop="content" show-overflow-tooltip min-width="160" />
-      <el-table-column label="状态" width="100">
+      <el-table-column label="状态" width="110" align="center">
         <template #default="scope">
           <el-tag :type="statusType(scope.row.status)" size="small">{{ statusText(scope.row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="补录" width="70" align="center">
+      <el-table-column label="补录" width="80" align="center">
         <template #default="scope">
           <el-tag v-if="scope.row.isBackfill" type="info" size="small">补录</el-tag>
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="操作" width="230" fixed="right" align="center">
         <template #default="scope">
           <template v-if="scope.row.status === 'PENDING'">
-            <el-button link type="success" @click="handleApprove(scope.row)" v-hasPermi="['smtchs:review:approve']">确认</el-button>
-            <el-button link type="danger" @click="handleReject(scope.row)" v-hasPermi="['smtchs:review:reject']">驳回</el-button>
+            <el-button link type="success" class="op-btn" @click="handleApprove(scope.row)" v-hasPermi="['smtchs:review:approve']">确认</el-button>
+            <el-button link type="danger" class="op-btn" @click="handleReject(scope.row)" v-hasPermi="['smtchs:review:reject']">驳回</el-button>
           </template>
           <el-button v-if="scope.row.status === 'APPROVED'" link type="primary" @click="handleRevise(scope.row)" v-hasPermi="['smtchs:review:revise']">修正</el-button>
-          <el-button link type="primary" @click="handleDetail(scope.row)">详情</el-button>
+          <el-button link type="primary" class="op-btn" @click="handleDetail(scope.row)">详情</el-button>
         </template>
       </el-table-column>
     </el-table>

@@ -34,7 +34,7 @@ INSERT INTO `sys_menu`
  `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`,
  `update_by`, `update_time`, `remark`)
 VALUES
-('服务记录管理', 0, 5, 'smtchs', NULL, '', 1, 0,
+('服务记录管理', 0, 0, 'smtchs', NULL, '', 1, 0,
  'M', '0', '0', NULL, 'documentation', 'admin', NOW(),
  '', NULL, 'SM TCHS 上门服务工时计费系统');
 

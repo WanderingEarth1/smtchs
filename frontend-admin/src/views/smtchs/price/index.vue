@@ -32,7 +32,7 @@
       </el-table-column>
       <el-table-column label="操作" width="140" fixed="right" align="center">
         <template #default="scope">
-          <el-button link type="primary" icon="CopyDocument" @click="handleCopy(scope.row)" v-hasPermi="['smtchs:price:edit']">复制此行</el-button>
+          <el-button link type="primary" icon="CopyDocument" class="op-btn" @click="handleCopy(scope.row)" v-hasPermi="['smtchs:price:edit']">复制此行</el-button>
         </template>
       </el-table-column>
     </el-table>

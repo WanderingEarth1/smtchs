@@ -69,23 +69,23 @@
         <span style="float: right; color: #909399; font-size: 12px">按提成金额排序 · 点击行下钻明细</span>
       </template>
       <el-table :data="report?.byEmployee || []" @row-click="handleDrill">
-        <el-table-column label="员工" prop="employeeName" width="120" />
-        <el-table-column label="次数" width="90" align="right">
+        <el-table-column label="员工" prop="employeeName" min-width="140" show-overflow-tooltip />
+        <el-table-column label="次数" min-width="100" align="right">
           <template #default="scope">{{ scope.row.summary.countTotal }}</template>
         </el-table-column>
-        <el-table-column label="正常时长" width="120" align="right">
+        <el-table-column label="正常时长" min-width="130" align="right">
           <template #default="scope">{{ formatHours(scope.row.summary.normalHoursTotal) }}</template>
         </el-table-column>
-        <el-table-column label="加班时长" width="120" align="right">
+        <el-table-column label="加班时长" min-width="130" align="right">
           <template #default="scope">{{ formatHours(scope.row.summary.overtimeHoursTotal) }}</template>
         </el-table-column>
-        <el-table-column label="按次金额" width="130" align="right">
+        <el-table-column label="按次金额" min-width="140" align="right">
           <template #default="scope">¥{{ formatMoney(scope.row.summary.byCountAmount) }}</template>
         </el-table-column>
-        <el-table-column label="按时金额" width="130" align="right">
+        <el-table-column label="按时金额" min-width="140" align="right">
           <template #default="scope">¥{{ formatMoney(scope.row.summary.byHourAmount) }}</template>
         </el-table-column>
-        <el-table-column label="提成合计" width="140" align="right">
+        <el-table-column label="提成合计" min-width="150" align="right">
           <template #default="scope">
             <strong>¥{{ formatMoney(scope.row.summary.totalAmount) }}</strong>
           </template>
