@@ -96,7 +96,9 @@ async function loadData() {
 
     const rules = rulesRes.data || rulesRes.rows || []
     workTypes.value = (typesRes.data || typesRes.rows || []).filter(w => w.enabled)
-    employees.value = (empsRes.rows || empsRes.data || []).filter(e => e.status === '0')
+    // 只保留启用中的工程师（排除管理员账号）
+    employees.value = (empsRes.rows || empsRes.data || [])
+      .filter(e => e.status === '0' && e.role === 'EMPLOYEE')
 
     // 组装矩阵：行=员工，列=工作类型单价
     matrix.value = employees.value.map(emp => {

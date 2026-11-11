@@ -238,50 +238,81 @@ certbot --nginx -d h5.your-domain.com
 
 ## 六、管理端 PC 部署
 
-### 6.1 获取若依前端
+### 6.1 结构
 
-```bash
-# 注意：frontend-admin/ 目录已存在（内含 src/api/smtchs 与 src/views/smtchs），
-# 请克隆到临时目录后再合并，不要直接 clone 到该目录
-git clone https://gitee.com/y_project/RuoYi-Vue3.git /tmp/ruoyi-frontend
-cd /tmp/ruoyi-frontend && pnpm install
+`frontend-admin/` 是**完整的若依 RuoYi-Vue3 v3.9.2 前端源码**（Vue 3.5.26 + Element Plus 2.13.1 + Vite 6.4.1），已内置：
+
+```
+frontend-admin/
+├── src/api/smtchs/      ← 业务 API（7 个模块，本项目新增）
+├── src/views/smtchs/    ← 业务页面（7 个页面，本项目新增）
+└── 其余为若依官方代码（layout / router / store / utils / components 等）
 ```
 
-然后把本仓库的 `frontend-admin/src/` 覆盖到 `/tmp/ruoyi-frontend/src/`（只覆盖同名业务目录）。
+**无需手工合并**——直接安装依赖并构建即可。
 
-### 6.2 合并业务代码
-
-把本仓库 `frontend-admin/src/api/smtchs/` 和 `frontend-admin/src/views/smtchs/` 拷贝到若依前端对应目录。
-
-### 6.3 配置后端地址
-
-编辑 `frontend-admin/.env.production`：
+### 6.2 安装与构建
 
 ```bash
-VITE_APP_BASE_API = '/prod-api'
-```
-
-编辑 `frontend-admin/vite.config.js` 的 proxy：
-
-```javascript
-proxy: {
-  '/prod-api': {
-    target: 'http://localhost:8080',
-    changeOrigin: true,
-    rewrite: (p) => p.replace(/^\/prod-api/, '')
-  }
-}
-```
-
-### 6.4 构建
-
-```bash
+cd frontend-admin
+pnpm install
 pnpm build:prod
 ```
 
-产物在 `dist/`，部署方式同员工端。
+> 若 `pnpm install` 提示 `ERR_PNPM_IGNORED_BUILDS`，在 `frontend-admin/pnpm-workspace.yaml` 中声明：
+> ```yaml
+> onlyBuiltDependencies:
+>   - esbuild
+>   - vue-demi
+> ```
 
----
+产物在 `dist/`。
+
+### 6.3 开发调试
+
+```bash
+cd frontend-admin
+pnpm dev
+```
+
+默认 `http://localhost:80`，通过 `vite.config.js` 的 `baseUrl` 代理到后端：
+
+```javascript
+const baseUrl = 'http://localhost:8080' // 后端接口
+```
+
+### 6.4 生产部署
+
+```nginx
+server {
+    listen 80;
+    server_name admin.your-domain.com;
+    root /var/www/smtchs-admin;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /prod-api/ {
+        proxy_pass http://127.0.0.1:8080/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+`.env.production` 中 `VITE_APP_BASE_API = '/prod-api'`。
+
+### 6.5 关闭验证码（可选）
+
+开发/内网环境可关闭登录验证码：
+
+```sql
+UPDATE sys_config SET config_value = 'false' WHERE config_key = 'sys.account.captchaEnabled';
+```
+
+然后清 Redis 缓存：`redis-cli FLUSHALL`。
 
 ## 七、排错清单
 
