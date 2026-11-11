@@ -1,3 +1,14 @@
+# 自签证书配置模板
+#
+# 用法：
+#   1. 把 IP.2 起的地址改成你的局域网 IP（用 ifconfig / ipconfig 查看）
+#   2. 执行：
+#      openssl req -x509 -newkey rsa:2048 -nodes \
+#        -keyout key.pem -out cert.pem -days 365 -config san.cnf
+#   3. 重启两个前端服务
+#
+# 说明：浏览器要求 GPS 定位必须在 HTTPS 下，局域网访问需要此证书。
+
 [req]
 distinguished_name = req_distinguished_name
 x509_extensions = v3_req
@@ -16,6 +27,5 @@ extendedKeyUsage = serverAuth
 DNS.1 = localhost
 DNS.2 = smtchs.local
 IP.1 = 127.0.0.1
-IP.2 = 192.168.2.79
-IP.3 = 192.168.2.23
-IP.4 = 44.10.1.37
+# 改成你的局域网 IP，可加多行 IP.3 / IP.4 ...
+IP.2 = 192.168.1.100

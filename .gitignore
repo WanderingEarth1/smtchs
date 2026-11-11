@@ -22,3 +22,10 @@ frontend-admin/node_modules/.vite/
 
 # macOS
 .DS_Store
+
+# 本地 HTTPS 证书（含私钥，不入库）
+certs/*.pem
+certs/*.key
+
+# 局域网访问文档（含内网 IP，本地保留）
+docs/局域网访问.md

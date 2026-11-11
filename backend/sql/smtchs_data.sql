@@ -44,7 +44,8 @@ VALUES
   ('客户培训', 'BY_HOUR',  0, 5, 'admin', NOW(), '', NULL, '0');
 
 -- =============================================================================
--- 3. 单价矩阵 smt_price_rule（20 条 = 4 员工 × 5 工作类型）
+-- 3. 单价矩阵 smt_price_rule（25 条 = 5 员工 × 5 工作类型）
+--    含管理员账号：管理员也可能上门服务，需配单价才能创建工单
 --    单价单位：按次为 元/次，按小时为 元/小时
 --    生效时间统一为 2026-10-01 00:00:00
 -- =============================================================================
@@ -98,7 +99,19 @@ VALUES
   ((SELECT id FROM `smt_employee` WHERE account = 'zhaoliu'),
    (SELECT id FROM `smt_work_type` WHERE name = '巡检保养'), 35.00, '2026-10-01 00:00:00', 'admin', NOW(), '', NULL, '0'),
   ((SELECT id FROM `smt_employee` WHERE account = 'zhaoliu'),
-   (SELECT id FROM `smt_work_type` WHERE name = '客户培训'), 90.00, '2026-10-01 00:00:00', 'admin', NOW(), '', NULL, '0');
+   (SELECT id FROM `smt_work_type` WHERE name = '客户培训'), 90.00, '2026-10-01 00:00:00', 'admin', NOW(), '', NULL, '0'),
+
+  -- 管理员：与张三同价（管理员也可能上门服务）
+  ((SELECT id FROM `smt_employee` WHERE account = 'admin'),
+   (SELECT id FROM `smt_work_type` WHERE name = '送货上门'), 50.00, '2026-10-01 00:00:00', 'admin', NOW(), '', NULL, '0'),
+  ((SELECT id FROM `smt_employee` WHERE account = 'admin'),
+   (SELECT id FROM `smt_work_type` WHERE name = '安装调试'), 90.00, '2026-10-01 00:00:00', 'admin', NOW(), '', NULL, '0'),
+  ((SELECT id FROM `smt_employee` WHERE account = 'admin'),
+   (SELECT id FROM `smt_work_type` WHERE name = '维修维护'), 80.00, '2026-10-01 00:00:00', 'admin', NOW(), '', NULL, '0'),
+  ((SELECT id FROM `smt_employee` WHERE account = 'admin'),
+   (SELECT id FROM `smt_work_type` WHERE name = '巡检保养'), 40.00, '2026-10-01 00:00:00', 'admin', NOW(), '', NULL, '0'),
+  ((SELECT id FROM `smt_employee` WHERE account = 'admin'),
+   (SELECT id FROM `smt_work_type` WHERE name = '客户培训'), 100.00, '2026-10-01 00:00:00', 'admin', NOW(), '', NULL, '0');
 
 -- =============================================================================
 -- 4. 计费配置 smt_sys_config（1 条，全局唯一）
